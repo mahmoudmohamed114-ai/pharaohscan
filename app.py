@@ -202,69 +202,47 @@ except Exception as e:
         "training_candidates": MockCollection([])
     })
 
-# ─── Load YOLO Models (Lazy Loading to prevent startup timeout) ──────────────
+# ─── Load YOLO Models (Memory-Optimized: ONLY YOLOv11) ──────────────────────
 from ultralytics import YOLO
 
-# Model weight paths
-colab_v8_path = "models/yolov8_best.pt"
-local_v8_path = "models/best.pt"
 colab_y11_path = "models/yolo11_best.pt"
-
-# Resolve paths at startup (no actual loading yet)
-if os.path.exists(colab_v8_path):
-    model_path_v8 = colab_v8_path
-    is_custom_yolov8 = True
-elif os.path.exists(local_v8_path):
-    model_path_v8 = local_v8_path
-    is_custom_yolov8 = True
-else:
-    model_path_v8 = "yolov8n.pt"
-    is_custom_yolov8 = False
+local_y11_path = "models/yolo11n.pt"
 
 if os.path.exists(colab_y11_path):
     model_path_y11 = colab_y11_path
     is_custom_yolo11 = True
     is_yolo11_demo = False
-elif is_custom_yolov8:
-    model_path_y11 = model_path_v8
-    is_custom_yolo11 = True
-    is_yolo11_demo = True
+elif os.path.exists(local_y11_path):
+    model_path_y11 = local_y11_path
+    is_custom_yolo11 = False
+    is_yolo11_demo = False
 else:
     model_path_y11 = "yolo11n.pt"
     is_custom_yolo11 = False
     is_yolo11_demo = False
 
-print(f"[INFO] YOLOv8 will load on first request: {model_path_v8} (custom={is_custom_yolov8})")
-print(f"[INFO] YOLO11  will load on first request: {model_path_y11} (custom={is_custom_yolo11}, demo={is_yolo11_demo})")
+model_path_v8 = model_path_y11
+is_custom_yolov8 = is_custom_yolo11
+
+print(f"[INFO] Single YOLO11 model configured: {model_path_y11} (custom={is_custom_yolo11})")
 
 # ── Lazy singletons ──────────────────────────────────────────────────────────
-_yolo_v8 = None
 _yolo_y11 = None
-yolo_world_model = None
-
-def get_yolo_v8():
-    global _yolo_v8
-    if _yolo_v8 is None:
-        print(f"[INFO] Loading YOLOv8 model: {model_path_v8}")
-        _yolo_v8 = YOLO(model_path_v8)
-    return _yolo_v8
 
 def get_yolo_y11():
     global _yolo_y11
     if _yolo_y11 is None:
-        print(f"[INFO] Loading YOLO11 model: {model_path_y11}")
+        print(f"[INFO] Loading YOLO11 model into memory: {model_path_y11}")
         _yolo_y11 = YOLO(model_path_y11)
     return _yolo_y11
 
+def get_yolo_v8():
+    # Alias to YOLO11 to save RAM (no duplicate model loading)
+    return get_yolo_y11()
+
 def get_yolo_world():
-    global yolo_world_model
-    if yolo_world_model is None:
-        world_path = "models/yolov8s-world.pt"
-        if not os.path.exists(world_path):
-            world_path = "yolov8s-world.pt"
-        print(f"[INFO] Loading YOLO-World model: {world_path}")
-        yolo_world_model = YOLO(world_path)
-    return yolo_world_model
+    # Disabled to save 500MB+ RAM on 1GB instances
+    return None
 
 # ─── Geohash Utility (Pure Python, 100% self-contained) ────────────────────────
 def geohash_encode(latitude, longitude, precision=6):
