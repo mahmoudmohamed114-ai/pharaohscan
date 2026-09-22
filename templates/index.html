@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PharaohScan - Egyptian Heritage Detection</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+            max-width: 900px;
+            width: 100%;
+            padding: 60px 40px;
+            text-align: center;
+        }
+        
+        h1 {
+            color: #333;
+            font-size: 2.5em;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 40px;
+        }
+        
+        .features {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+            margin: 50px 0;
+        }
+        
+        .feature {
+            padding: 30px;
+            background: #f8f9fa;
+            border-radius: 15px;
+            border-left: 5px solid #667eea;
+        }
+        
+        .feature h3 {
+            color: #667eea;
+            margin-bottom: 15px;
+            font-size: 1.3em;
+        }
+        
+        .feature p {
+            color: #666;
+            line-height: 1.6;
+        }
+        
+        .button-group {
+            display: flex;
+            gap: 15px;
+            margin-top: 50px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+        
+        .btn {
+            padding: 15px 40px;
+            font-size: 1.1em;
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-decoration: none;
+            display: inline-block;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-3px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+        
+        .btn-secondary {
+            background: white;
+            color: #667eea;
+            border: 2px solid #667eea;
+        }
+        
+        .btn-secondary:hover {
+            background: #667eea;
+            color: white;
+        }
+        
+        .status {
+            margin-top: 40px;
+            padding: 20px;
+            background: #e8f5e9;
+            border-radius: 10px;
+            color: #2e7d32;
+        }
+        
+        .status.error {
+            background: #ffebee;
+            color: #c62828;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                padding: 40px 20px;
+            }
+            
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            .features {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔺 PharaohScan</h1>
+        <p class="subtitle">AI-Powered Egyptian Heritage Detection & Analysis</p>
+        
+        <div class="features">
+            <div class="feature">
+                <h3>🎯 Object Detection</h3>
+                <p>Detect ancient Egyptian artifacts and landmarks using YOLOv8 and YOLO11 models</p>
+            </div>
+            <div class="feature">
+                <h3>🤖 AI Recognition</h3>
+                <p>Identify heritage sites with advanced machine learning and Gemini AI analysis</p>
+            </div>
+            <div class="feature">
+                <h3>📊 Model Comparison</h3>
+                <p>Compare inference results between different YOLO architectures in real-time</p>
+            </div>
+        </div>
+        
+        <div class="button-group">
+            <a href="/static/" class="btn btn-primary">Upload & Detect</a>
+            <a href="/api/analytics" class="btn btn-secondary">View Analytics</a>
+            <a href="/api/health" class="btn btn-secondary">Health Check</a>
+        </div>
+        
+        <div class="status" id="status">
+            <strong>✓ System Status:</strong> Ready to process images
+        </div>
+    </div>
+    
+    <script>
+        // Check server health
+        fetch('/api/health')
+            .then(r => r.json())
+            .then(data => {
+                const status = document.getElementById('status');
+                if (data.status === 'ok') {
+                    let models = [];
+                    if (data.models_loaded.yolov8) models.push('YOLOv8');
+                    if (data.models_loaded.yolo11) models.push('YOLO11');
+                    if (models.length > 0) {
+                        status.innerHTML = `<strong>✓ System Status:</strong> Ready (Models loaded: ${models.join(', ')})`;
+                    }
+                }
+            })
+            .catch(e => {
+                const status = document.getElementById('status');
+                status.classList.add('error');
+                status.innerHTML = '<strong>⚠ Warning:</strong> Could not connect to server';
+            });
+    </script>
+</body>
+</html>
+
