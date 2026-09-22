@@ -81,14 +81,20 @@ def get_mongo_uri():
 db_uri = get_mongo_uri()
 print(f"[INFO] Connecting to MongoDB: {db_uri}")
 try:
-    mongo_client = pymongo.MongoClient(db_uri, serverSelectionTimeoutMS=5000)
+    mongo_client = pymongo.MongoClient(
+        db_uri,
+        serverSelectionTimeoutMS=15000,
+        connectTimeoutMS=15000,
+        tls=True,
+        tlsAllowInvalidCertificates=True
+    )
     db = mongo_client["heritage_social"]
     # Check connection
     mongo_client.admin.command('ping')
     print("[SUCCESS] MongoDB connected successfully!")
     use_mongodb = True
 except Exception as e:
-    print(f"[WARNING] MongoDB Atlas is unreachable. Running in offline/mock database mode: {e}")
+    print(f"[WARNING] MongoDB Atlas is unreachable. Running in offline/mock database mode. Error: {e}")
     use_mongodb = False
     # Mock databases
     class MockCollection:
