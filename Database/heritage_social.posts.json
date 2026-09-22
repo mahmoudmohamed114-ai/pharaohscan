@@ -1,0 +1,56 @@
+[{
+  "_id": {
+    "$oid": "6a84bc1e9d10c4e455277b41"
+  },
+  "post_id": "P001",
+  "content": "Amazing sunset at the pyramids!",
+  "location_id": "L001",
+  "object_id": null
+},
+{
+  "_id": {
+    "$oid": "6a84bc289d10c4e455277b43"
+  },
+  "post_id": "P002",
+  "content": "The Khafre Pyramid is amazing!",
+  "location_id": "L001",
+  "object_id": "O001"
+},
+{
+  "_id": {
+    "$oid": "6a84bc329d10c4e455277b45"
+  },
+  "post_id": "P003",
+  "content": "Beautiful view of the Sphinx!",
+  "location_id": "L001",
+  "object_id": "O003"
+},
+{
+  "_id": {
+    "$oid": "6a84bc3b9d10c4e455277b47"
+  },
+  "post_id": "P004",
+  "content": "The Mask of Tutankhamun is incredible!",
+  "location_id": "L002",
+  "object_id": "O002"
+},
+{
+  "_id": {
+    "$oid": "6a8a1b0ece11db6ad4ea769a"
+  },
+  "post_id": "P005",
+  "content": "The Great Pyramid of Khufu was built around 2560 BCE and stood 146 metres tall.",
+  "location_id": "L001",
+  "object_id": "O004",
+  "__v": 0
+},
+{
+  "_id": {
+    "$oid": "6a8a1b0ece11db6ad4ea769b"
+  },
+  "post_id": "P006",
+  "content": "The Great Pyramid is the oldest and largest of the Seven Wonders of the Ancient World.",
+  "location_id": "L001",
+  "object_id": "O004",
+  "__v": 0
+}]

@@ -1,0 +1,23 @@
+[{
+  "_id": {
+    "$oid": "6a8ad6e3c514c9a7422faf03"
+  },
+  "imagePath": "uploads/candidates/f38e8331-f22d-4c3e-9f4d-0df76e215b05.jpg",
+  "description": "A restored ancient Egyptian mastaba facade featuring a central doorway framed by two cylindrical limestone columns within an entrance portico. Two seated stone statues flank the entrance, set against a stepped block facade, with the upper portion of a large pyramid visible in the top-left background under a clear blue sky.",
+  "suggestedLandmark": "Tomb of Seshemnefer IV",
+  "isNewLandmark": true,
+  "confidence": 95,
+  "reason": "The image features the distinctive portico entrance of the Mastaba of Seshemnefer IV (LG 53) at Giza, recognized by its twin columns and seated statues, with the Great Pyramid visible in the background.",
+  "latitude": 29.9792,
+  "longitude": 31.1342,
+  "nearbyLandmarks": [
+    "Khafre Pyramid",
+    "Sphinx",
+    "Great Pyramid"
+  ],
+  "status": "pending",
+  "createdAt": {
+    "$date": "2026-08-23T11:17:55.206Z"
+  },
+  "__v": 0
+}]

@@ -1,0 +1,25 @@
+# ─── Python cache ─────────────────────────────────────────────────────────────
+__pycache__/
+*.py[cod]
+*$py.class
+*.pyc
+
+# ─── Environment / Secrets ────────────────────────────────────────────────────
+.env
+atlas-credentials.env
+
+# ─── Local runtime dirs (recreated at startup) ────────────────────────────────
+temp_uploads/
+expanded_dataset/
+runs/
+
+# ─── Large training data not needed for serving ───────────────────────────────
+egypt-landmarks-3-classes/
+
+# ─── OS noise ─────────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+
+# ─── IDE ──────────────────────────────────────────────────────────────────────
+.vscode/
+.idea/

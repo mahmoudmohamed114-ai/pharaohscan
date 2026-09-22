@@ -1,0 +1,14 @@
+{
+  "image_name": "muhammad_ali_mosque.jpg",
+  "description": "An Ottoman-era mosque situated in the Citadel of Cairo, Egypt.",
+  "suggested_class": "Mosque-of-Muhammad-Ali",
+  "bounding_box": {
+    "x_center": 0.5,
+    "y_center": 0.5,
+    "width": 0.6,
+    "height": 0.6
+  },
+  "zero_shot_confidence": 0.95,
+  "verified": true,
+  "source": "user_collection"
+}

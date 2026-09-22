@@ -1,0 +1,53 @@
+[{
+  "_id": {
+    "$oid": "6a84baba9d10c4e455277b39"
+  },
+  "object_id": "O001",
+  "name": "Khafre Pyramid",
+  "class_name": "Khafre-Pyramid",
+  "location_id": "L001",
+  "geohash": "stq4s2",
+  "latitude": 29.9761,
+  "longitude": 31.1308,
+  "radius_m": 80
+},
+{
+  "_id": {
+    "$oid": "6a84bac49d10c4e455277b3b"
+  },
+  "object_id": "O002",
+  "name": "Mask of Tutankhamun",
+  "class_name": "Mask-of-Tutankhamun",
+  "location_id": "L002",
+  "geohash": "stq4yw",
+  "latitude": 30.0478,
+  "longitude": 31.2336,
+  "radius_m": 80
+},
+{
+  "_id": {
+    "$oid": "6a84bad29d10c4e455277b3d"
+  },
+  "object_id": "O003",
+  "name": "Sphinx",
+  "class_name": "Sphinx",
+  "location_id": "L001",
+  "geohash": "stq4s8",
+  "latitude": 29.9753,
+  "longitude": 31.1376,
+  "radius_m": 80
+},
+{
+  "_id": {
+    "$oid": "6a8a1b0ece11db6ad4ea7699"
+  },
+  "object_id": "O004",
+  "name": "Great Pyramid",
+  "class_name": "Great-Pyramid",
+  "location_id": "L001",
+  "latitude": 29.9792,
+  "longitude": 31.1342,
+  "geohash": "stq4s3",
+  "radius_m": 80,
+  "__v": 0
+}]

@@ -1,0 +1,20 @@
+[{
+  "_id": {
+    "$oid": "6a84621e9d10c4e455277b1d"
+  },
+  "location_id": "L001",
+  "name": "Giza Pyramids",
+  "latitude": 29.9792,
+  "longitude": 31.1342,
+  "geohash": "stq4s3"
+},
+{
+  "_id": {
+    "$oid": "6a84bb0a9d10c4e455277b3f"
+  },
+  "location_id": "L002",
+  "name": "Egyptian Museum",
+  "latitude": 30.0478,
+  "longitude": 31.2336,
+  "geohash": "stq4yw"
+}]

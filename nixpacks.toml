@@ -1,0 +1,35 @@
+[phases.setup]
+nixPkgs = [
+    "python311",
+    "xorg.libxcb",
+    "xorg.libX11",
+    "xorg.libXext",
+    "xorg.libXrender",
+    "libGL",
+    "libGLU",
+    "glib",
+    "zlib",
+    "stdenv.cc.cc.lib"
+]
+nixLibs = [
+    "xorg.libxcb",
+    "xorg.libX11",
+    "xorg.libXext",
+    "xorg.libXrender",
+    "libGL",
+    "libGLU",
+    "glib",
+    "zlib",
+    "stdenv.cc.cc.lib"
+]
+
+[phases.install]
+cmds = [
+    "python3.11 -m venv --copies /opt/venv",
+    "/opt/venv/bin/pip install --upgrade pip",
+    "/opt/venv/bin/pip install opencv-python-headless",
+    "/opt/venv/bin/pip install -r requirements.txt"
+]
+
+[start]
+cmd = "/opt/venv/bin/gunicorn app:app --worker-class eventlet -w 1 --timeout 120 --bind 0.0.0.0:$PORT"

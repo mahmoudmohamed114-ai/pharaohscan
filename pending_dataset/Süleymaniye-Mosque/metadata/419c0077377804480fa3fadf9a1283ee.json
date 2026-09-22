@@ -1,0 +1,14 @@
+{
+  "image_name": "images (1).jpg",
+  "description": "A panoramic view captured at sunset, featuring a grand mosque with a large central dome and multiple smaller domes, flanked by four tall, slender minarets. The mosque is situated atop a hill, dominating the skyline against an orange and pink sky. Below the mosque, a dense urban landscape of buildings with red-tiled roofs and various architectural styles stretches down to a body of water in the foreground. Several passenger boats or ferries, including one named 'VENUS', are visible on the water, with urban structures on the opposite bank faintly visible in the distance. A bird is soaring in the sky near the mosque.",
+  "suggested_class": "S\u00fcleymaniye-Mosque",
+  "bounding_box": {
+    "x_center": 0.5,
+    "y_center": 0.5,
+    "width": 0.5,
+    "height": 0.5
+  },
+  "zero_shot_confidence": 0.98,
+  "verified": true,
+  "source": "user_collection"
+}

@@ -1,0 +1,14 @@
+{
+  "image_name": "cairo_tower.jpg",
+  "description": "A tall, iconic free-standing tower featuring a distinctive concrete openwork lattice design resembling a lotus flower, situated along the Nile River in Cairo.",
+  "suggested_class": "Cairo-Tower",
+  "bounding_box": {
+    "x_center": 0.5037,
+    "y_center": 0.3735,
+    "width": 0.0854,
+    "height": 0.6183
+  },
+  "zero_shot_confidence": 0.98,
+  "verified": true,
+  "source": "user_collection"
+}
