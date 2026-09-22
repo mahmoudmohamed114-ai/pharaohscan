@@ -819,106 +819,22 @@ def register_landmark_object(landmark_name, class_name=None, lat=None, lng=None,
         
     return obj_doc
 
-# ─── Async Job Queue (persisted to MongoDB to survive Railway restarts) ────────
+# ─── Async Job Queue (prevents Railway 60s proxy timeout on YOLO inference) ───
 import threading
-_job_store = {}   # in-memory fallback: job_id -> {"status": ..., "result": ...}
+_job_store = {}   # job_id -> {"status": "pending"|"done"|"error", "result": {...}}
 _job_lock  = threading.Lock()
 
-def _job_write(job_id, status, result=None):
-    """Write a job record to both in-memory store and MongoDB."""
-    record = {"job_id": job_id, "status": status}
-    if result is not None:
-        record["result"] = result
-    with _job_lock:
-        _job_store[job_id] = record
-    # Persist to MongoDB so the job survives a worker restart / reconnect
-    if use_mongodb:
-        try:
-            db["detect_jobs"].update_one(
-                {"job_id": job_id},
-                {"$set": record},
-                upsert=True
-            )
-        except Exception as _je:
-            print(f"[WARNING] Could not persist job {job_id} to MongoDB: {_je}")
-
-def _job_read(job_id):
-    """Read a job record from in-memory store, falling back to MongoDB."""
-    with _job_lock:
-        job = _job_store.get(job_id)
-    if job is not None:
-        return job
-    # Fallback: query MongoDB (handles worker-restart / new-process scenario)
-    if use_mongodb:
-        try:
-            job = db["detect_jobs"].find_one({"job_id": job_id})
-            if job:
-                return job
-        except Exception as _je:
-            print(f"[WARNING] Could not read job {job_id} from MongoDB: {_je}")
-    return None
-
-def _job_delete(job_id):
-    """Clean up a job record from both stores."""
-    with _job_lock:
-        _job_store.pop(job_id, None)
-    if use_mongodb:
-        try:
-            db["detect_jobs"].delete_one({"job_id": job_id})
-        except Exception:
-            pass
-
-# Ensure TTL index on detect_jobs so old records expire automatically (1 hour)
-def _ensure_job_ttl_index():
-    if use_mongodb:
-        try:
-            db["detect_jobs"].create_index("createdAt", expireAfterSeconds=3600)
-        except Exception:
-            pass
-try:
-    _ensure_job_ttl_index()
-except Exception:
-    pass
-
 def _run_detect_job(job_id, detect_fn, *args, **kwargs):
-    """Run detection via eventlet.tpool (real OS thread) so the event loop stays free.
-
-    eventlet.monkey_patch() turns threading.Thread into greenlets.  Greenlets are
-    *cooperative* — they only yield at I/O boundaries.  YOLO inference is pure CPU
-    with zero I/O yield points, so a plain greenlet would freeze the entire event
-    loop for the whole inference duration (30-120 s), preventing ALL other requests
-    and SocketIO messages from being processed.  Railway's 60-second proxy timeout
-    then kills the connection and restarts the worker, wiping the in-memory job.
-
-    eventlet.tpool.execute() dispatches to a true OS thread-pool thread so the
-    event loop remains free to handle polling requests and SocketIO traffic while
-    YOLO runs in parallel.
-    """
+    """Run a detection job in a background thread and store the result."""
     try:
-        # ── Run the CPU-heavy detection in a real OS thread ──────────────────
-        try:
-            import eventlet.tpool
-            result = eventlet.tpool.execute(detect_fn, *args, **kwargs)
-        except ImportError:
-            # eventlet not available (local dev without eventlet) — run directly
-            result = detect_fn(*args, **kwargs)
-
-        _job_write(job_id, "done", result)
-        # Push result directly to the client via SocketIO (fastest delivery path)
-        try:
-            socketio.emit("detect_result", {"job_id": job_id, "data": result})
-        except Exception as _se:
-            print(f"[WARNING] SocketIO emit failed for job {job_id}: {_se}")
-
+        result = detect_fn(*args, **kwargs)
+        with _job_lock:
+            _job_store[job_id] = {"status": "done", "result": result}
     except Exception as e:
         import traceback
         traceback.print_exc()
-        err_result = {"error": str(e)}
-        _job_write(job_id, "error", err_result)
-        try:
-            socketio.emit("detect_result", {"job_id": job_id, "error": str(e)})
-        except Exception:
-            pass
+        with _job_lock:
+            _job_store[job_id] = {"status": "error", "result": {"error": str(e)}}
 
 # ─── API Routes ───────────────────────────────────────────────────────────────
 @app.route('/favicon.ico')
@@ -926,30 +842,22 @@ def favicon():
     # Suppress browser 404 for favicon
     return '', 204
 
-@app.route('/api/version')
-def api_version():
-    """Returns the deployed code version — used to verify Railway deployment."""
-    return jsonify({
-        "version": "v4-sync-detect",
-        "detect_mode": "synchronous",
-        "async_job_system": False,
-        "commit": "ba4ff79"
-    })
-
 @app.route('/')
 def index():
     return render_template('index.html')
 
 @app.route('/api/detect/result/<job_id>', methods=['GET'])
 def api_detect_result(job_id):
-    """Poll for the result of an async detect job (falls back to MongoDB if worker restarted)."""
-    job = _job_read(job_id)
+    """Poll for the result of an async detect job."""
+    with _job_lock:
+        job = _job_store.get(job_id)
     if job is None:
         return jsonify({"status": "not_found"}), 404
     if job["status"] == "pending":
         return jsonify({"status": "pending"})
     # Clean up after delivery
-    _job_delete(job_id)
+    with _job_lock:
+        _job_store.pop(job_id, None)
     if job["status"] == "error":
         return jsonify(job["result"]), 500
     return jsonify(job["result"])
@@ -1131,13 +1039,7 @@ def api_detect():
         return jsonify({'error': 'No selected file'}), 400
 
     # Read ALL data from request BEFORE spawning thread (Flask request context dies after return)
-    # Frontend sends 'model'; also support legacy 'model_type' key
-    model_type = request.form.get('model_type') or request.form.get('model', 'yolov8')
-    # Normalise: 'yolov8' -> 'v8', 'yolo11'/'v11' stays 'v11'
-    if model_type in ('yolov8', 'v8'):
-        model_type = 'v8'
-    else:
-        model_type = 'v11'
+    model_type = request.form.get('model_type', 'v11')
     lat_form   = request.form.get('lat', '29.9792')
     lng_form   = request.form.get('lng', '31.1342')
     filename   = file.filename
@@ -1150,33 +1052,18 @@ def api_detect():
     if img is None:
         return jsonify({'error': 'Invalid image format'}), 400
 
-    # ── Run detection synchronously in a real OS thread ──────────────────────
-    # The async job pattern (job_id + polling) was broken on Railway because
-    # multiple container instances don't share memory, so the polling request
-    # often hits a different instance than the one that wrote the job.
-    #
-    # Detection takes 10-30 s total (YOLO ~2s + Gemini API ~10s), which is
-    # well within Railway's request timeout. We run it in eventlet.tpool so
-    # the event loop stays free during the CPU-heavy YOLO inference.
-    try:
-        import eventlet.tpool
-        result = eventlet.tpool.execute(
-            _do_detect_sync,
-            file_bytes, img, filename, mimetype, model_type, lat_form, lng_form
-        )
-    except ImportError:
-        # eventlet not installed (local dev) — run directly
-        result = _do_detect_sync(
-            file_bytes, img, filename, mimetype, model_type, lat_form, lng_form
-        )
+    # Create job entry and launch background thread
+    job_id = str(uuid.uuid4())
+    with _job_lock:
+        _job_store[job_id] = {"status": "pending"}
 
-    # Emit via SocketIO so any connected client tab also receives the result
-    try:
-        socketio.emit("detect_result", {"data": result})
-    except Exception:
-        pass
+    threading.Thread(
+        target=_run_detect_job,
+        args=(job_id, _do_detect_sync, file_bytes, img, filename, mimetype, model_type, lat_form, lng_form),
+        daemon=True
+    ).start()
 
-    return jsonify(result)
+    return jsonify({"job_id": job_id, "status": "pending"})
 
 
 def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, lng_form):

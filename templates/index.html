@@ -1,0 +1,1839 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Heritage Explorer - Social & AI Landmark Detection</title>
+    <!-- Google Fonts: Inter & Outfit -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Outfit:wght@500;600;700;800&display=swap"
+        rel="stylesheet">
+
+    <!-- Leaflet.js for Interactive Map -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+    <!-- Socket.IO Client -->
+    <script src="https://cdn.socket.io/4.7.5/socket.io.min.js"></script>
+
+    <style>
+        :root {
+            --bg-color: #0d1117;
+            --card-bg: rgba(22, 27, 34, 0.85);
+            --card-border: rgba(255, 255, 255, 0.1);
+            --primary-emerald: #10b981;
+            --primary-cyan: #06b6d4;
+            --primary-purple: #a855f7;
+            --primary-pink: #ec4899;
+            --text-main: #f0f6fc;
+            --text-muted: #8b949e;
+            --accent-glow: rgba(16, 185, 129, 0.2);
+            --danger-color: #f43f5e;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            background-image:
+                radial-gradient(circle at 15% 15%, rgba(16, 185, 129, 0.07) 0%, transparent 40%),
+                radial-gradient(circle at 85% 85%, rgba(6, 182, 212, 0.07) 0%, transparent 40%);
+        }
+
+        /* ── Header ── */
+        header {
+            padding: 24px 40px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--card-border);
+            background: rgba(13, 17, 23, 0.85);
+            backdrop-filter: blur(12px);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        header .brand h1 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 2rem;
+            font-weight: 800;
+            background: linear-gradient(135deg, #34d399 0%, #38bdf8 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            letter-spacing: -0.5px;
+        }
+
+        header .brand p {
+            color: var(--text-muted);
+            font-size: 0.95rem;
+            margin-top: 2px;
+        }
+
+        .header-badges {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .badge-live {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            padding: 6px 12px;
+            border-radius: 20px;
+            background: rgba(16, 185, 129, 0.12);
+            color: var(--primary-emerald);
+            font-size: 0.85rem;
+            font-weight: 600;
+            border: 1px solid rgba(16, 185, 129, 0.3);
+        }
+
+        .badge-live .pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: var(--primary-emerald);
+            box-shadow: 0 0 8px var(--primary-emerald);
+            animation: pulse 2s infinite;
+        }
+
+        @keyframes pulse {
+            0% {
+                opacity: 1;
+                transform: scale(1);
+            }
+
+            50% {
+                opacity: 0.4;
+                transform: scale(1.3);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1);
+            }
+        }
+
+        /* ── Main Container ── */
+        .container {
+            flex: 1;
+            max-width: 1500px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 30px 40px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+
+        @media (max-width: 1024px) {
+            .container {
+                grid-template-columns: 1fr;
+                padding: 20px;
+            }
+        }
+
+        /* ── Cards ── */
+        .card {
+            background: var(--card-bg);
+            border: 1px solid var(--card-border);
+            border-radius: 16px;
+            padding: 24px;
+            backdrop-filter: blur(16px);
+            margin-bottom: 24px;
+            box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+        }
+
+        .card-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 18px;
+            padding-bottom: 12px;
+            border-bottom: 1px solid var(--card-border);
+        }
+
+        .card-header h2 {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.25rem;
+            font-weight: 700;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            color: #fff;
+        }
+
+        /* ── Location Controls ── */
+        .btn-use-loc {
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #fff;
+            border: none;
+            padding: 10px 18px;
+            border-radius: 10px;
+            font-weight: 600;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 0.9rem;
+            transition: all 0.2s ease;
+            box-shadow: 0 4px 12px rgba(16, 185, 129, 0.25);
+        }
+
+        .btn-use-loc:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 6px 16px rgba(16, 185, 129, 0.4);
+        }
+
+        .coords-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr auto;
+            gap: 14px;
+            margin: 16px 0;
+            align-items: flex-end;
+        }
+
+        .coord-group label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+            text-transform: uppercase;
+            font-weight: 600;
+            letter-spacing: 0.5px;
+        }
+
+        .coord-group input {
+            width: 100%;
+            background: rgba(13, 17, 23, 0.8);
+            border: 1px solid var(--card-border);
+            border-radius: 8px;
+            padding: 10px 14px;
+            color: #fff;
+            font-size: 0.95rem;
+            font-family: monospace;
+            outline: none;
+            transition: border-color 0.2s;
+        }
+
+        .coord-group input:focus {
+            border-color: var(--primary-emerald);
+        }
+
+        .btn-update-loc {
+            background: rgba(255, 255, 255, 0.08);
+            color: #fff;
+            border: 1px solid var(--card-border);
+            padding: 10px 16px;
+            border-radius: 8px;
+            font-weight: 600;
+            cursor: pointer;
+            height: 42px;
+            transition: all 0.2s;
+        }
+
+        .btn-update-loc:hover {
+            background: rgba(255, 255, 255, 0.15);
+        }
+
+        #leaflet-map {
+            height: 240px;
+            border-radius: 12px;
+            border: 1px solid var(--card-border);
+            margin-top: 14px;
+            z-index: 1;
+        }
+
+        /* ── Simulator Buttons ── */
+        .simulator-box {
+            background: rgba(13, 17, 23, 0.6);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 12px;
+        }
+
+        .simulator-desc {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+        }
+
+        .sim-btn-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+        }
+
+        .sim-btn {
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid var(--card-border);
+            color: var(--text-main);
+            padding: 10px;
+            border-radius: 10px;
+            font-size: 0.88rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-align: center;
+        }
+
+        .sim-btn:hover,
+        .sim-btn.active {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: var(--primary-emerald);
+            color: var(--primary-emerald);
+            transform: translateY(-2px);
+        }
+
+        /* ── Geofence Tracker & Posts ── */
+        .proximity-alert {
+            margin-top: 16px;
+            padding: 14px 18px;
+            border-radius: 10px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .proximity-alert.inactive {
+            background: rgba(255, 255, 255, 0.03);
+            border-color: var(--card-border);
+            color: var(--text-muted);
+        }
+
+        .post-card {
+            background: rgba(13, 17, 23, 0.7);
+            border: 1px solid var(--card-border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 12px;
+            transition: border-color 0.2s;
+        }
+
+        .post-card:hover {
+            border-color: rgba(16, 185, 129, 0.4);
+        }
+
+        .post-card .post-author {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 8px;
+        }
+
+        .post-card .author-avatar {
+            width: 32px;
+            height: 32px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, #10b981 0%, #06b6d4 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            font-weight: 700;
+        }
+
+        .post-card .post-content {
+            font-size: 0.95rem;
+            line-height: 1.5;
+            color: #d1d5db;
+        }
+
+        /* ── Right Column: Image Detection ── */
+        .upload-area {
+            border: 2px dashed rgba(255, 255, 255, 0.15);
+            border-radius: 14px;
+            padding: 30px;
+            text-align: center;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            background: rgba(13, 17, 23, 0.4);
+        }
+
+        .upload-area:hover,
+        .upload-area.dragover {
+            border-color: var(--primary-emerald);
+            background: rgba(16, 185, 129, 0.05);
+        }
+
+        .upload-icon {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+            color: var(--primary-emerald);
+        }
+
+        .btn-detect {
+            width: 100%;
+            margin-top: 16px;
+            background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+            color: #fff;
+            border: none;
+            padding: 14px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+
+        .btn-detect:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45);
+        }
+
+        .btn-detect:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* ── AI Analysis & Unknown Notice ── */
+        .unknown-notice {
+            background: rgba(245, 158, 11, 0.08);
+            border: 1px solid rgba(245, 158, 11, 0.3);
+            border-radius: 12px;
+            padding: 16px;
+            margin-top: 20px;
+            color: #fcd34d;
+        }
+
+        .unknown-notice h4 {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1rem;
+            margin-bottom: 8px;
+        }
+
+        .unknown-notice p {
+            font-size: 0.9rem;
+            color: #e5e7eb;
+            line-height: 1.4;
+        }
+
+        /* ── AI Analysis Card ── */
+        .ai-analysis-card {
+            background: rgba(17, 24, 39, 0.9);
+            border: 1px solid rgba(168, 85, 247, 0.35);
+            border-radius: 14px;
+            padding: 20px;
+            margin-top: 18px;
+            box-shadow: 0 8px 25px rgba(168, 85, 247, 0.15);
+        }
+
+        .ai-analysis-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+
+        .badge-new-landmark {
+            background: linear-gradient(135deg, #a855f7 0%, #ec4899 100%);
+            color: #fff;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.75rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        .ai-prop-row {
+            margin-bottom: 12px;
+        }
+
+        .ai-prop-label {
+            font-size: 0.75rem;
+            text-transform: uppercase;
+            letter-spacing: 0.6px;
+            color: var(--text-muted);
+            font-weight: 600;
+            margin-bottom: 4px;
+        }
+
+        .ai-prop-value {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: #f9fafb;
+        }
+
+        .ai-prop-desc {
+            font-size: 0.92rem;
+            color: #d1d5db;
+            line-height: 1.5;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        /* ── Exact Zero-Shot Confirmation Card (Screenshot Match) ── */
+        .zero-shot-card {
+            background: #11141c;
+            border: 1px solid rgba(185, 6, 212, 0.4);
+            border-radius: 16px;
+            padding: 24px;
+            margin-top: 20px;
+            box-shadow: 0 10px 30px rgba(185, 6, 212, 0.15);
+            animation: fadeIn 0.3s ease;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+                transform: translateY(10px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .zero-shot-tag {
+            font-size: 0.75rem;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            color: #ec4899;
+            text-transform: uppercase;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            margin-bottom: 8px;
+        }
+
+        .zero-shot-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.6rem;
+            font-weight: 700;
+            color: #ffffff;
+            margin-bottom: 14px;
+        }
+
+        .zero-shot-desc-box {
+            background: #0b0e14;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            padding: 14px 18px;
+            font-style: italic;
+            font-size: 0.95rem;
+            color: #9ca3af;
+            line-height: 1.5;
+            margin-bottom: 18px;
+        }
+
+        .zero-shot-prompt {
+            font-size: 0.92rem;
+            color: #94a3b8;
+            margin-bottom: 16px;
+        }
+
+        .zero-shot-actions {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 14px;
+        }
+
+        .btn-confirm {
+            background: #10b981;
+            color: #ffffff;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-confirm:hover {
+            background: #059669;
+            transform: translateY(-1px);
+        }
+
+        .btn-reject {
+            background: #ef4444;
+            color: #ffffff;
+            border: none;
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-reject:hover {
+            background: #dc2626;
+            transform: translateY(-1px);
+        }
+
+        .preview-img-container {
+            margin-top: 16px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--card-border);
+            max-height: 350px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            background: #000;
+        }
+
+        .preview-img-container img {
+            max-width: 100%;
+            max-height: 350px;
+            object-fit: contain;
+        }
+
+        /* ── Toasts ── */
+        .toast-container {
+            position: fixed;
+            bottom: 30px;
+            right: 30px;
+            z-index: 9999;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            max-width: calc(100vw - 40px);
+        }
+
+        .toast {
+            background: #1f2937;
+            border: 1px solid var(--primary-emerald);
+            color: #fff;
+            padding: 14px 20px;
+            border-radius: 10px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+            animation: slideUp 0.3s ease;
+            font-size: 0.92rem;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+
+        /* ── Auto-Confirm Card ── */
+        .auto-confirm-card {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(6, 182, 212, 0.06) 100%);
+            border: 1px solid rgba(16, 185, 129, 0.45);
+            border-radius: 16px;
+            padding: 22px;
+            margin-top: 18px;
+            animation: fadeIn 0.4s ease;
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.12);
+        }
+
+        .auto-confirm-header {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+
+        .badge-auto-confirmed {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: #fff;
+            padding: 4px 12px;
+            border-radius: 20px;
+            font-size: 0.72rem;
+            font-weight: 700;
+            text-transform: uppercase;
+            letter-spacing: 0.8px;
+        }
+
+        .auto-confirm-title {
+            font-family: 'Outfit', sans-serif;
+            font-size: 1.5rem;
+            font-weight: 700;
+            color: #fff;
+            margin-bottom: 6px;
+        }
+
+        .auto-confirm-meta {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            margin-bottom: 12px;
+            line-height: 1.5;
+        }
+
+        .auto-confirm-desc {
+            background: rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 8px;
+            padding: 12px 16px;
+            font-size: 0.9rem;
+            color: #9ca3af;
+            font-style: italic;
+            line-height: 1.5;
+            margin-bottom: 12px;
+        }
+
+        .auto-confirm-saved-badge {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(16, 185, 129, 0.1);
+            border: 1px solid rgba(16, 185, 129, 0.35);
+            color: var(--primary-emerald);
+            padding: 10px 16px;
+            border-radius: 10px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            width: 100%;
+            justify-content: center;
+        }
+
+        /* ── Mobile Responsive ── */
+        @media (max-width: 768px) {
+            header {
+                padding: 14px 16px;
+                flex-wrap: wrap;
+                gap: 10px;
+            }
+
+            header .brand h1 {
+                font-size: 1.4rem;
+            }
+
+            header .brand p {
+                font-size: 0.8rem;
+            }
+
+            .header-badges {
+                gap: 8px;
+                flex-wrap: wrap;
+            }
+
+            .badge-live span {
+                display: none;
+            }
+
+            .container {
+                padding: 12px;
+                gap: 16px;
+            }
+
+            .card {
+                padding: 16px;
+                margin-bottom: 16px;
+                border-radius: 12px;
+            }
+
+            .card-header h2 {
+                font-size: 1.05rem;
+            }
+
+            .btn-use-loc {
+                padding: 8px 12px;
+                font-size: 0.82rem;
+            }
+
+            .coords-row {
+                grid-template-columns: 1fr 1fr;
+                gap: 10px;
+            }
+
+            .coords-row .btn-update-loc {
+                grid-column: 1 / -1;
+                width: 100%;
+            }
+
+            #leaflet-map {
+                height: 200px;
+            }
+
+            .sim-btn-grid {
+                grid-template-columns: repeat(2, 1fr) !important;
+                gap: 8px;
+            }
+
+            .sim-btn {
+                padding: 10px 8px;
+                font-size: 0.82rem;
+            }
+
+            .proximity-alert {
+                flex-direction: column;
+                align-items: flex-start;
+                gap: 8px;
+                padding: 12px 14px;
+            }
+
+            .proximity-alert>div:last-child {
+                align-self: flex-end;
+            }
+
+            .post-card {
+                padding: 12px;
+            }
+
+            .zero-shot-card {
+                padding: 16px;
+            }
+
+            .zero-shot-title {
+                font-size: 1.25rem;
+            }
+
+            .zero-shot-actions {
+                grid-template-columns: 1fr;
+                gap: 10px;
+            }
+
+            .btn-confirm,
+            .btn-reject {
+                padding: 14px;
+                font-size: 1rem;
+            }
+
+            .ai-analysis-card {
+                padding: 14px;
+            }
+
+            .upload-area {
+                padding: 20px 16px;
+            }
+
+            .btn-detect {
+                padding: 12px;
+                font-size: 0.95rem;
+            }
+
+            .toast-container {
+                bottom: 14px;
+                right: 14px;
+                left: 14px;
+            }
+
+            .toast {
+                font-size: 0.85rem;
+                padding: 12px 14px;
+            }
+
+            .auto-confirm-title {
+                font-size: 1.2rem;
+            }
+
+            .add-post-form {
+                padding: 14px;
+            }
+        }
+
+        @media (max-width: 420px) {
+            .sim-btn-grid {
+                grid-template-columns: 1fr 1fr !important;
+            }
+
+            .coords-row {
+                grid-template-columns: 1fr;
+            }
+
+            .coords-row .btn-update-loc {
+                grid-column: 1;
+            }
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Header -->
+    <header>
+        <div class="brand">
+            <h1>Heritage Explorer</h1>
+            <p>Discover heritage places and social content around you.</p>
+        </div>
+        <div class="header-badges">
+            <div class="badge-live">
+                <div class="pulse-dot"></div>
+                <span>MongoDB Atlas & Socket.IO Active</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Container -->
+    <div class="container">
+
+        <!-- ── Left Column: Your Location & Live Object Tracker ── -->
+        <div class="column-left">
+
+            <!-- Card 1: Your Location -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>📍 Your Location</h2>
+                    <button class="btn-use-loc" id="btn-use-location">
+                        📍 Use My Location
+                    </button>
+                </div>
+
+                <div class="coords-row">
+                    <div class="coord-group">
+                        <label for="input-lat">Latitude</label>
+                        <input type="number" step="0.000001" id="input-lat" value="29.979200">
+                    </div>
+                    <div class="coord-group">
+                        <label for="input-lng">Longitude</label>
+                        <input type="number" step="0.000001" id="input-lng" value="31.134200">
+                    </div>
+                    <button class="btn-update-loc" id="btn-update-coords">Update</button>
+                </div>
+
+                <div id="leaflet-map"></div>
+            </div>
+
+            <!-- Card 2: Live Object Tracker -->
+            <div class="card">
+                <div class="card-header">
+                    <h2>📍 Live Object Tracker</h2>
+                </div>
+
+                <div class="simulator-box">
+                    <p class="simulator-desc">Demo — simulate walking to a heritage object:</p>
+                    <div class="sim-btn-grid" id="sim-btn-grid"
+                        style="grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                        <!-- Dynamically populated from MongoDB /api/objects -->
+                    </div>
+                </div>
+
+                <div class="proximity-alert" id="proximity-status">
+                    <div>
+                        <strong id="proximity-title">Inside Zone: Great Pyramid</strong>
+                        <div style="font-size: 0.85rem; color: var(--text-muted); margin-top: 2px;"
+                            id="proximity-distance">
+                            Distance: 0m away (Geofence Triggered)
+                        </div>
+                    </div>
+                    <span class="badge-live" style="background: rgba(16, 185, 129, 0.2);">🎯 In Geofence</span>
+                </div>
+            </div>
+
+            <!-- Card 3: Social Posts Near You -->
+            <div class="card">
+                <div class="card-header" style="display: flex; justify-content: space-between; align-items: center;">
+                    <h2>💬 Social Posts Near You</h2>
+                    <button class="btn-use-loc" id="btn-toggle-add-post"
+                        style="background: rgba(139, 92, 246, 0.2); border: 1px solid var(--primary-purple); color: #c4b5fd; font-size: 0.8rem; padding: 6px 12px; cursor: pointer; border-radius: 8px;">
+                        ✍️ Add Post
+                    </button>
+                </div>
+
+                <!-- Add Post Form (Expandable) -->
+                <div id="add-post-form-box"
+                    style="display: none; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.1); border-radius: 12px; padding: 14px; margin-bottom: 16px;">
+                    <div style="font-size: 0.85rem; color: #a78bfa; margin-bottom: 8px; font-weight: 600;"
+                        id="posting-location-indicator">
+                        📍 Posting to: Great Pyramid
+                    </div>
+                    <input type="text" id="post-author-input" placeholder="Your Name or Handle (e.g. Archaeologist)"
+                        style="width: 100%; box-sizing: border-box; padding: 8px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.85rem; margin-bottom: 8px; outline: none;">
+                    <textarea id="post-content-input" rows="3"
+                        placeholder="Share your experience, historical fact, or tip about this landmark..."
+                        style="width: 100%; box-sizing: border-box; padding: 10px 12px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.9rem; resize: vertical; outline: none; margin-bottom: 10px;"></textarea>
+                    <div style="display: flex; justify-content: flex-end; gap: 8px;">
+                        <button id="btn-cancel-post"
+                            style="padding: 6px 14px; background: transparent; border: 1px solid rgba(255,255,255,0.2); border-radius: 8px; color: var(--text-muted); cursor: pointer; font-size: 0.85rem;">
+                            Cancel
+                        </button>
+                        <button id="btn-submit-post"
+                            style="padding: 6px 16px; background: linear-gradient(135deg, var(--primary-purple), #6366f1); border: none; border-radius: 8px; color: #fff; font-weight: 600; cursor: pointer; font-size: 0.85rem;">
+                            🚀 Share Post
+                        </button>
+                    </div>
+                </div>
+
+                <div id="social-posts-container">
+                    <!-- Dynamic Posts streamed via MongoDB Atlas & Socket.IO -->
+                </div>
+            </div>
+
+        </div>
+
+        <!-- ── Right Column: Detect Landmark from Image ── -->
+        <div class="column-right">
+
+            <div class="card">
+                <div class="card-header">
+                    <h2>🔍 Detect Landmark from Image</h2>
+                </div>
+
+                <div class="upload-area" id="drop-zone">
+                    <div class="upload-icon">📷</div>
+                    <p style="font-weight: 600; font-size: 1.05rem; margin-bottom: 4px;">Choose Image</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted);">Click to browse or drag and drop a landmark
+                        photo</p>
+                    <input type="file" id="file-input" accept="image/*" style="display: none;">
+                </div>
+
+                <button class="btn-detect" id="btn-detect" disabled>
+                    🏛️ Detect & Find Posts
+                </button>
+
+                <div class="preview-img-container" id="preview-box" style="display: none;">
+                    <img id="preview-image" src="" alt="Landmark Preview">
+                </div>
+
+                <!-- ── Result Container ── -->
+                <div id="result-container" style="display: none;">
+
+                    <!-- Case A: Known / One-Shot Confirmed Landmark -->
+                    <div id="known-result-box" style="display: none; margin-top: 20px;">
+                        <div class="badge-live" style="margin-bottom: 12px; font-size: 0.9rem;" id="known-badge">
+                            ✅ Custom Dataset Model (Recognized)
+                        </div>
+                        <h3 id="known-landmark-title" style="font-size: 1.4rem; color: #fff; margin-bottom: 6px;"></h3>
+                        <p id="known-confidence"
+                            style="color: var(--primary-emerald); font-weight: 600; margin-bottom: 14px;"></p>
+                    </div>
+
+                    <!-- Case B: Unknown Landmark with AI Analysis & Zero-Shot Confirmation -->
+                    <div id="unknown-result-box" style="display: none;">
+
+                        <!-- Auto-Confirm Section (populated by JS when landmark already in DB) -->
+                        <div id="auto-confirm-section" style="display: none;"></div>
+
+                        <!-- Unknown Notice -->
+                        <div class="unknown-notice">
+                            <h4>🔍 We couldn't identify this landmark from our dataset.</h4>
+                            <p>Based on your current location, you may be near:</p>
+                            <p id="nearby-candidates-text" style="font-weight: 600; color: #fff; margin-top: 4px;">
+                                No known landmarks in this area.
+                            </p>
+                        </div>
+
+                        <!-- ✨ AI Analysis Card -->
+                        <div class="ai-analysis-card">
+                            <div class="ai-analysis-header">
+                                <h3
+                                    style="font-size: 1.15rem; color: #fff; display: flex; align-items: center; gap: 8px;">
+                                    ✨ AI Analysis
+                                </h3>
+                                <span class="badge-new-landmark" id="ai-badge">🆕 New Landmark</span>
+                            </div>
+
+                            <div class="ai-prop-row">
+                                <div class="ai-prop-label">Possible Landmark</div>
+                                <div class="ai-prop-value" id="ai-possible-landmark">Cairo Tower</div>
+                            </div>
+
+                            <div class="ai-prop-row">
+                                <div class="ai-prop-label">Confidence</div>
+                                <div class="ai-prop-value" id="ai-confidence" style="color: var(--primary-purple);">98%
+                                </div>
+                            </div>
+
+                            <div class="ai-prop-row">
+                                <div class="ai-prop-label">Description</div>
+                                <div class="ai-prop-desc" id="ai-description"></div>
+                            </div>
+
+                            <div class="ai-prop-row" id="ai-reason-row">
+                                <div class="ai-prop-label">Reason</div>
+                                <div class="ai-prop-desc" id="ai-reason" style="font-size: 0.88rem; color: #9ca3af;">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 🔍 Exact Zero-Shot Confirmation Card (Screenshot Match) -->
+                        <div class="zero-shot-card" id="zero-shot-card">
+                            <div class="zero-shot-tag">
+                                🔍 UNKNOWN LANDMARK DETECTED & LOCATED VIA ZERO-SHOT
+                            </div>
+                            <div class="zero-shot-title" id="zs-title">
+                                Egyptian Temple
+                            </div>
+                            <div class="zero-shot-desc-box" id="zs-desc">
+                                An ancient Egyptian temple containing large stone columns and carved walls.
+                            </div>
+                            <div class="zero-shot-prompt">
+                                Would you like to confirm this Zero-Shot annotation and save it to your training
+                                dataset?
+                            </div>
+                            <div class="zero-shot-actions">
+                                <button class="btn-confirm" id="btn-confirm-sample">
+                                    ✅ Confirm & Save Sample
+                                </button>
+                                <button class="btn-reject" id="btn-reject-sample">
+                                    ❌ Reject Prediction
+                                </button>
+                            </div>
+                        </div>
+
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- Toast Notifications -->
+    <div class="toast-container" id="toast-container"></div>
+
+    <script>
+        // State variables
+        let currentLat = 29.9792;
+        let currentLng = 31.1342;
+        let currentObjectId = null;
+        let currentObjectName = "Great Pyramid";
+        let currentLocationId = null;
+        let selectedFile = null;
+        let activeCandidateData = null;
+        let landmarkMarkers = [];
+        let allTrackerObjects = [];
+
+        // Leaflet Map Initialization
+        const map = L.map('leaflet-map').setView([currentLat, currentLng], 15);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '© OpenStreetMap contributors'
+        }).addTo(map);
+
+        let userMarker = L.marker([currentLat, currentLng]).addTo(map).bindPopup("<b>You are here</b>").openPopup();
+
+        // Socket.IO Setup
+        const socket = io();
+
+        socket.on('connect', () => {
+            console.log("Connected to Real-time Socket.IO Server");
+        });
+
+        socket.on('object_changed', (data) => {
+            const objName = data.object ? data.object.name : 'Unknown';
+            showToast(`📍 Now viewing: ${objName}`);
+            renderPosts(data.posts);
+        });
+
+        socket.on('object_registered', (data) => {
+            if (data && data.object) {
+                showToast(`📍 New Landmark Registered: ${data.object.name}!`);
+                loadTrackerObjects(data.object.name);
+            }
+        });
+
+        socket.on('new_post', (data) => {
+            if (data && data.post) {
+                const author = data.post.author || 'Explorer';
+                showToast(`💬 New post published by ${author}!`);
+                if (currentObjectId) {
+                    fetch(`/api/posts?object_id=${currentObjectId}`)
+                        .then(r => r.json())
+                        .then(posts => renderPosts(posts))
+                        .catch(() => { });
+                }
+            }
+        });
+
+        function showToast(msg) {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = 'toast';
+            toast.innerHTML = `<span>✨</span> <div>${msg}</div>`;
+            container.appendChild(toast);
+            setTimeout(() => {
+                toast.remove();
+            }, 4000);
+        }
+
+        // Object Icon Resolver
+        function getObjectIcon(name) {
+            const n = (name || '').toLowerCase();
+            if (n.includes('pyramid')) return '🔺';
+            if (n.includes('sphinx')) return '🦁';
+            if (n.includes('tutankhamun') || n.includes('mask') || n.includes('king')) return '👑';
+            if (n.includes('mosque') || n.includes('masjid') || n.includes('islamic') || n.includes('minaret') || n.includes('muhammad ali') || n.includes('azhar') || n.includes('hassan') || n.includes('tulun')) return '🕌';
+            if (n.includes('tower') || n.includes('cairo tower')) return '🗼';
+            if (n.includes('citadel') || n.includes('fort') || n.includes('castle')) return '🏰';
+            if (n.includes('temple') || n.includes('luxor') || n.includes('karnak') || n.includes('abu simbel')) return '🏛️';
+            if (n.includes('museum')) return '🏛️';
+            if (n.includes('church') || n.includes('monastery')) return '⛪';
+            if (n.includes('statue') || n.includes('tomb') || n.includes('mastaba') || n.includes('seshemnefer')) return '🗿';
+            return '📍';
+        }
+
+        // Render Posts
+        function renderPosts(posts) {
+            const container = document.getElementById('social-posts-container');
+            if (!posts || posts.length === 0) {
+                const placeName = currentObjectName || "this location";
+                container.innerHTML = `
+                    <div style="text-align: center; padding: 24px 12px; background: rgba(255,255,255,0.02); border-radius: 12px; border: 1px dashed rgba(255,255,255,0.1); margin-top: 6px;">
+                        <p style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 12px;">
+                            No posts shared yet for <strong>${placeName}</strong>.
+                        </p>
+                        <button onclick="document.getElementById('add-post-form-box').style.display='block'; document.getElementById('post-content-input').focus();" 
+                                style="padding: 7px 16px; background: rgba(139, 92, 246, 0.2); border: 1px solid var(--primary-purple); color: #c4b5fd; border-radius: 8px; cursor: pointer; font-size: 0.85rem; font-weight: 600;">
+                            ✍️ Be the first to share a post!
+                        </button>
+                    </div>
+                `;
+                return;
+            }
+
+            container.innerHTML = posts.map(p => {
+                const initial = (p.author || 'H').charAt(0).toUpperCase();
+                const authorName = p.author || 'Heritage Explorer';
+                const dateStr = p.createdAt ? new Date(p.createdAt).toLocaleDateString() : 'Verified Post';
+                return `
+                    <div class="post-card">
+                        <div class="post-author">
+                            <div class="author-avatar">${initial}</div>
+                            <div>
+                                <strong style="color: #fff; font-size: 0.95rem;">${authorName}</strong>
+                                <div style="font-size: 0.75rem; color: var(--text-muted);">${dateStr}</div>
+                            </div>
+                        </div>
+                        <div class="post-content">${p.content}</div>
+                    </div>
+                `;
+            }).join('');
+        }
+
+        // Trigger Movement Simulation
+        async function moveTo(lat, lng, name, objectId) {
+            currentLat = lat;
+            currentLng = lng;
+            document.getElementById('input-lat').value = lat.toFixed(6);
+            document.getElementById('input-lng').value = lng.toFixed(6);
+
+            userMarker.setLatLng([lat, lng]);
+            map.panTo([lat, lng]);
+
+            // Sync active button state in tracker
+            document.querySelectorAll('.sim-btn').forEach(btn => {
+                const bName = btn.dataset.name.toLowerCase().replace(/[-_ ]/g, '');
+                const targetName = (name || '').toLowerCase().replace(/[-_ ]/g, '');
+                if (bName === targetName || (targetName && bName.includes(targetName))) {
+                    btn.classList.add('active');
+                } else {
+                    btn.classList.remove('active');
+                }
+            });
+
+            // Immediately update context to the selected object
+            currentObjectName = name;
+
+            const locIndicator = document.getElementById('posting-location-indicator');
+            if (locIndicator) locIndicator.innerText = `📍 Posting to: ${name}`;
+
+            try {
+                const res = await fetch('/api/simulate/move', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        lat: lat,
+                        lng: lng,
+                        userId: 'demo-user',
+                        previousObjectId: currentObjectId,
+                        requestedObjectId: objectId || null
+                    })
+                });
+                const data = await res.json();
+
+                currentObjectId = data.currentObjectId;
+                currentObjectName = data.currentObjectName || name;
+                currentLocationId = data.locationId || null;
+
+                // If backend returned real corrected coordinates, pan map to those
+                if (data.real_lat && data.real_lng) {
+                    const realLat = parseFloat(data.real_lat);
+                    const realLng = parseFloat(data.real_lng);
+                    userMarker.setLatLng([realLat, realLng]);
+                    map.panTo([realLat, realLng]);
+                    document.getElementById('input-lat').value = realLat.toFixed(6);
+                    document.getElementById('input-lng').value = realLng.toFixed(6);
+                }
+
+                if (locIndicator) locIndicator.innerText = `📍 Posting to: ${currentObjectName}`;
+
+                const statusEl = document.getElementById('proximity-status');
+                // Show geofence status only if it actually matched the selected object
+                if (data.geofence_hit && data.geofence_object === data.currentObjectName) {
+                    statusEl.className = 'proximity-alert';
+                    document.getElementById('proximity-title').innerText = `Inside Zone: ${data.currentObjectName}`;
+                    document.getElementById('proximity-distance').innerText = `Distance: ${data.distance_m}m away (Geofence Triggered)`;
+                } else if (data.currentObjectName) {
+                    statusEl.className = 'proximity-alert';
+                    document.getElementById('proximity-title').innerText = `Viewing: ${data.currentObjectName}`;
+                    document.getElementById('proximity-distance').innerText = `Browsing posts for this location.`;
+                } else {
+                    statusEl.className = 'proximity-alert inactive';
+                    document.getElementById('proximity-title').innerText = `Searching for nearby objects...`;
+                    document.getElementById('proximity-distance').innerText = `No heritage object in immediate 80m radius.`;
+                }
+
+                renderPosts(data.posts);
+
+            } catch (err) {
+                console.error("Simulation error:", err);
+            }
+        }
+
+        // Add Post Event Handlers
+        document.getElementById('btn-toggle-add-post').addEventListener('click', () => {
+            const box = document.getElementById('add-post-form-box');
+            const isHidden = box.style.display === 'none' || !box.style.display;
+            box.style.display = isHidden ? 'block' : 'none';
+            if (isHidden) {
+                document.getElementById('posting-location-indicator').innerText = `📍 Posting to: ${currentObjectName || 'Current Location'}`;
+                document.getElementById('post-content-input').focus();
+            }
+        });
+
+        document.getElementById('btn-cancel-post').addEventListener('click', () => {
+            document.getElementById('add-post-form-box').style.display = 'none';
+        });
+
+        document.getElementById('btn-submit-post').addEventListener('click', async () => {
+            const contentInput = document.getElementById('post-content-input');
+            const authorInput = document.getElementById('post-author-input');
+            const content = contentInput.value.trim();
+            if (!content) {
+                showToast("⚠️ Please enter post text before submitting.");
+                return;
+            }
+
+            const btn = document.getElementById('btn-submit-post');
+            btn.disabled = true;
+            btn.innerText = "⏳ Publishing...";
+
+            try {
+                const res = await fetch('/api/posts', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        content: content,
+                        author: authorInput.value.trim() || 'Heritage Explorer',
+                        object_id: currentObjectId,
+                        location_id: currentLocationId
+                    })
+                });
+                const data = await res.json();
+                if (!res.ok) throw new Error(data.error || 'Failed to publish post');
+
+                contentInput.value = '';
+                document.getElementById('add-post-form-box').style.display = 'none';
+                showToast("🎉 Post published successfully to MongoDB!");
+
+                // Refresh posts for current object
+                if (currentObjectId) {
+                    const pRes = await fetch(`/api/posts?object_id=${currentObjectId}`);
+                    const pData = await pRes.json();
+                    renderPosts(pData);
+                }
+            } catch (err) {
+                showToast(`❌ Error: ${err.message}`);
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "🚀 Share Post";
+            }
+        });
+
+        // Dynamically load objects into Live Object Tracker & Map
+        async function loadTrackerObjects(activeName) {
+            const grid = document.getElementById('sim-btn-grid');
+            if (!grid) return;
+
+            try {
+                const res = await fetch('/api/objects');
+                if (!res.ok) return;
+                const rawObjects = await res.json();
+                if (!rawObjects || rawObjects.length === 0) return;
+
+                // Deduplicate by name (keep first occurrence per unique name)
+                const seen = new Set();
+                const objects = rawObjects.filter(obj => {
+                    const key = (obj.name || '').toLowerCase().trim();
+                    if (seen.has(key)) return false;
+                    seen.add(key);
+                    return true;
+                });
+
+                allTrackerObjects = objects;
+                grid.innerHTML = '';
+
+                // Clear old map markers
+                landmarkMarkers.forEach(m => map.removeLayer(m));
+                landmarkMarkers = [];
+
+                objects.forEach(obj => {
+                    const icon = getObjectIcon(obj.name);
+                    const lat = parseFloat(obj.latitude || 29.9792);
+                    const lng = parseFloat(obj.longitude || 31.1342);
+                    const objId = obj.object_id || '';
+
+                    // 1. Create Simulator Button
+                    const btn = document.createElement('button');
+                    btn.className = 'sim-btn';
+                    btn.dataset.lat = lat;
+                    btn.dataset.lng = lng;
+                    btn.dataset.name = obj.name;
+                    btn.dataset.id = objId;
+                    btn.innerHTML = `${icon} ${obj.name}`;
+
+                    const isMatch = activeName && (
+                        obj.name.toLowerCase() === activeName.toLowerCase() ||
+                        obj.name.toLowerCase().replace(/[-_ ]/g, '') === activeName.toLowerCase().replace(/[-_ ]/g, '')
+                    );
+                    if (isMatch) {
+                        btn.classList.add('active');
+                    }
+
+                    btn.addEventListener('click', () => {
+                        document.querySelectorAll('.sim-btn').forEach(b => b.classList.remove('active'));
+                        btn.classList.add('active');
+                        moveTo(lat, lng, obj.name, objId);
+                    });
+
+                    grid.appendChild(btn);
+
+                    // 2. Add Landmark Marker on Leaflet Map
+                    const landmarkMarker = L.circleMarker([lat, lng], {
+                        radius: 8,
+                        fillColor: '#8b5cf6',
+                        color: '#ffffff',
+                        weight: 2,
+                        opacity: 1,
+                        fillOpacity: 0.85
+                    }).addTo(map);
+
+                    const safeName = obj.name.replace(/'/g, "\\'");
+                    landmarkMarker.bindPopup(`
+                        <div style="font-family: 'Plus Jakarta Sans', sans-serif; min-width: 130px; text-align: center;">
+                            <strong style="color: #111; font-size: 0.95rem;">${icon} ${obj.name}</strong><br>
+                            <span style="font-size: 0.75rem; color: #666;">Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}</span><br>
+                            <button onclick="moveTo(${lat}, ${lng}, '${safeName}', '${objId}')" 
+                                    style="margin-top: 6px; padding: 4px 10px; background: #8b5cf6; color: #fff; border: none; border-radius: 4px; cursor: pointer; font-size: 0.8rem; font-weight: 600;">
+                                📍 Walk Here
+                            </button>
+                        </div>
+                    `);
+                    landmarkMarkers.push(landmarkMarker);
+                });
+
+            } catch (err) {
+                console.error("Failed to load tracker objects:", err);
+            }
+        }
+
+        // Use My Location
+        document.getElementById('btn-use-location').addEventListener('click', () => {
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition((pos) => {
+                    const lat = pos.coords.latitude;
+                    const lng = pos.coords.longitude;
+                    moveTo(lat, lng, "Current Location");
+                    showToast("GPS Location Updated!");
+                }, () => {
+                    showToast("Could not access GPS. Using default coordinates.");
+                });
+            }
+        });
+
+        document.getElementById('btn-update-coords').addEventListener('click', () => {
+            const lat = parseFloat(document.getElementById('input-lat').value);
+            const lng = parseFloat(document.getElementById('input-lng').value);
+            moveTo(lat, lng, "Manual Location");
+        });
+
+        // Initial setup on page load: load all objects and set starting point
+        loadTrackerObjects("Great Pyramid").then(() => {
+            moveTo(currentLat, currentLng, "Great Pyramid");
+        });
+
+        // ── Image Upload & Detection ──
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+        const btnDetect = document.getElementById('btn-detect');
+        const previewBox = document.getElementById('preview-box');
+        const previewImage = document.getElementById('preview-image');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+
+        fileInput.addEventListener('change', (e) => {
+            if (e.target.files.length > 0) {
+                handleFile(e.target.files[0]);
+            }
+        });
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('dragover');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('dragover');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('dragover');
+            if (e.dataTransfer.files.length > 0) {
+                handleFile(e.dataTransfer.files[0]);
+            }
+        });
+
+        function handleFile(file) {
+            selectedFile = file;
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                previewImage.src = e.target.result;
+                previewBox.style.display = 'flex';
+                btnDetect.disabled = false;
+                document.getElementById('result-container').style.display = 'none';
+            };
+            reader.readAsDataURL(file);
+        }
+
+        btnDetect.addEventListener('click', async () => {
+            if (!selectedFile) return;
+
+            btnDetect.disabled = true;
+            btnDetect.innerHTML = `⏳ Uploading Image...`;
+
+            const formData = new FormData();
+            formData.append('image', selectedFile);
+            formData.append('model', 'yolov8');
+            formData.append('lat', currentLat);
+            formData.append('lng', currentLng);
+
+            try {
+                // Step 1: POST image → get job_id immediately
+                const res = await fetch('/api/detect', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (!res.ok) {
+                    const errText = await res.text();
+                    let errMsg = `Server returned status ${res.status}`;
+                    try { const errJson = JSON.parse(errText); if (errJson.error) errMsg = errJson.error; } catch (e) { }
+                    showToast(`Error: ${errMsg}`);
+                    btnDetect.disabled = false;
+                    btnDetect.innerHTML = `🏛️ Detect & Find Posts`;
+                    return;
+                }
+
+                const jobResp = await res.json();
+
+                // Handle legacy sync response (no job_id)
+                if (!jobResp.job_id) {
+                    processDetectResult(jobResp);
+                    btnDetect.disabled = false;
+                    btnDetect.innerHTML = `🏛️ Detect & Find Posts`;
+                    return;
+                }
+
+                // Step 2: Poll for result
+                const jobId = jobResp.job_id;
+                let dots = 0;
+                const messages = ['🔍 Running Detection...', '🧠 Analyzing with AI...', '🗺️ Matching Heritage Data...', '⏳ Almost there...'];
+                let msgIdx = 0;
+
+                const pollInterval = setInterval(async () => {
+                    dots = (dots + 1) % 4;
+                    btnDetect.innerHTML = messages[msgIdx % messages.length] + '.'.repeat(dots + 1);
+                    msgIdx++;
+
+                    try {
+                        const pollRes = await fetch(`/api/detect/result/${jobId}`);
+                        if (pollRes.status === 404) {
+                            clearInterval(pollInterval);
+                            showToast('Error: Job expired. Please try again.');
+                            btnDetect.disabled = false;
+                            btnDetect.innerHTML = `🏛️ Detect & Find Posts`;
+                            return;
+                        }
+                        const pollData = await pollRes.json();
+                        if (pollData.status === 'pending') return; // still running
+
+                        clearInterval(pollInterval);
+                        btnDetect.disabled = false;
+                        btnDetect.innerHTML = `🏛️ Detect & Find Posts`;
+
+                        if (pollData.error) { showToast(`Error: ${pollData.error}`); return; }
+                        processDetectResult(pollData);
+
+                    } catch (pollErr) {
+                        console.warn('Polling error:', pollErr);
+                    }
+                }, 2000);
+
+            } catch (err) {
+                btnDetect.disabled = false;
+                btnDetect.innerHTML = `🏛️ Detect & Find Posts`;
+                showToast(`Detection failed: ${err.message}`);
+            }
+        });
+
+        function processDetectResult(data) {
+            if (data.error) { showToast(`Error: ${data.error}`); return; }
+
+            // Show annotated image
+            if (data.image) {
+                previewImage.src = data.image;
+            }
+
+            document.getElementById('result-container').style.display = 'block';
+
+            if (data.auto_confirmed) {
+                // ── Auto-Confirm Flow: landmark already registered, just save ──
+                document.getElementById('known-result-box').style.display = 'none';
+                document.getElementById('unknown-result-box').style.display = 'block';
+
+                const gemini = data.gemini || {};
+                const objName = gemini.possibleLandmark || data.suggested_class || 'Landmark';
+
+                // Replace the unknown notice + zero-shot card with auto-confirm card
+                document.getElementById('nearby-candidates-text').innerText = '';
+                const unknownNotice = document.querySelector('.unknown-notice');
+                if (unknownNotice) unknownNotice.style.display = 'none';
+
+                // Build the auto-confirm card
+                const autoCard = document.getElementById('auto-confirm-section');
+                autoCard.style.display = 'block';
+                autoCard.innerHTML = `
+                        <div class="auto-confirm-card">
+                            <div class="auto-confirm-header">
+                                <span class="badge-auto-confirmed">✅ Auto-Confirmed</span>
+                                <span style="font-size:0.82rem;color:var(--text-muted);">Previously verified landmark</span>
+                            </div>
+                            <div class="auto-confirm-title">${objName}</div>
+                            <div class="auto-confirm-meta">
+                                Confidence: <strong>${gemini.confidence || 98}%</strong> &nbsp;·&nbsp;
+                                ${gemini.reason || 'Identified by AI and matched with registered dataset.'}
+                            </div>
+                            <div class="auto-confirm-desc">${gemini.description || ''}</div>
+                            <div class="auto-confirm-saved-badge">
+                                🎓 Training sample automatically added to dataset
+                            </div>
+                        </div>
+                    `;
+
+                // Hide the zero-shot confirm/reject buttons
+                const zeroShotCard = document.querySelector('.zero-shot-card');
+                if (zeroShotCard) zeroShotCard.style.display = 'none';
+                const aiCard = document.querySelector('.ai-analysis-card');
+                if (aiCard) aiCard.style.display = 'none';
+
+                // Sync map & posts
+                if (data.auto_object && data.auto_object.latitude && data.auto_object.longitude) {
+                    moveTo(data.auto_object.latitude, data.auto_object.longitude, objName, data.auto_object.object_id);
+                }
+                if (data.auto_posts && data.auto_posts.length > 0) {
+                    renderPosts(data.auto_posts);
+                }
+
+                // Reload tracker to show updated objects
+                loadTrackerObjects(objName);
+                showToast(`🎓 "${objName}" auto-confirmed & added to training dataset!`);
+
+            } else if (data.unknown) {
+                // Unknown Landmark Fallback Flow
+                document.getElementById('known-result-box').style.display = 'none';
+                document.getElementById('unknown-result-box').style.display = 'block';
+
+                // Reset auto-confirm section
+                const autoCard = document.getElementById('auto-confirm-section');
+                if (autoCard) autoCard.style.display = 'none';
+                const unknownNotice = document.querySelector('.unknown-notice');
+                if (unknownNotice) unknownNotice.style.display = 'block';
+                const zeroShotCard = document.querySelector('.zero-shot-card');
+                if (zeroShotCard) zeroShotCard.style.display = 'block';
+                const aiCard = document.querySelector('.ai-analysis-card');
+                if (aiCard) aiCard.style.display = 'block';
+
+                activeCandidateData = data;
+                activeCandidateData.lat = currentLat;
+                activeCandidateData.lng = currentLng;
+
+                // Nearby candidates
+                const nearbyText = data.nearbyCandidates && data.nearbyCandidates.length > 0
+                    ? data.nearbyCandidates.map(c => `${c.locationName} (${c.objects.join(', ')})`).join('; ')
+                    : 'No known landmarks in this area.';
+                document.getElementById('nearby-candidates-text').innerText = nearbyText;
+
+                // AI Analysis Card
+                const gemini = data.gemini || {};
+                document.getElementById('ai-badge').innerText = gemini.isNewLandmark ? '🆕 New Landmark' : '📍 Nearby Candidate';
+                document.getElementById('ai-possible-landmark').innerText = gemini.possibleLandmark || data.suggested_class;
+                document.getElementById('ai-confidence').innerText = `${gemini.confidence || 98}%`;
+                document.getElementById('ai-description').innerText = gemini.description || data.description || '';
+
+                if (gemini.reason) {
+                    document.getElementById('ai-reason-row').style.display = 'block';
+                    document.getElementById('ai-reason').innerText = gemini.reason;
+                } else {
+                    document.getElementById('ai-reason-row').style.display = 'none';
+                }
+
+                // Zero-Shot Confirmation Card
+                document.getElementById('zs-title').innerText = gemini.possibleLandmark || data.suggested_class || 'Landmark Candidate';
+                document.getElementById('zs-desc').innerText = gemini.description || data.description || 'Verified landmark feature.';
+
+            } else {
+                // Known Landmark Flow
+                document.getElementById('unknown-result-box').style.display = 'none';
+                document.getElementById('known-result-box').style.display = 'block';
+
+                const det = data.detections && data.detections[0] ? data.detections[0] : { class: 'Landmark', confidence: '99%' };
+                document.getElementById('known-landmark-title').innerText = `🏛️ ${det.class}`;
+                document.getElementById('known-confidence').innerText = `Confidence: ${det.confidence} (${data.recognition_method || 'YOLO'})`;
+
+                if (data.is_oneshot) {
+                    document.getElementById('known-badge').innerText = `🎯 Confirmed Custom Class (One-Shot Learned)`;
+                    document.getElementById('known-badge').style.background = 'rgba(16, 185, 129, 0.2)';
+                } else {
+                    document.getElementById('known-badge').innerText = `✅ Custom Dataset Model (YOLO)`;
+                }
+
+                // Auto-sync map location to detected landmark & trigger notifications
+                if (data.object && data.object.latitude && data.object.longitude) {
+                    const objName = data.object.name || det.class;
+                    moveTo(data.object.latitude, data.object.longitude, objName, data.object.object_id);
+
+                    document.querySelectorAll('.sim-btn').forEach(b => {
+                        const bName = b.dataset.name.toLowerCase().replace(/[-_ ]/g, '');
+                        const dName = objName.toLowerCase().replace(/[-_ ]/g, '');
+                        if (bName.includes(dName) || dName.includes(bName)) {
+                            b.classList.add('active');
+                        } else {
+                            b.classList.remove('active');
+                        }
+                    });
+
+                    showToast(`🎯 Landmark Detected: Synced location to ${objName}!`);
+                } else if (data.posts && data.posts.length > 0) {
+                    renderPosts(data.posts);
+                    showToast(`Found social posts for ${det.class}!`);
+                }
+            }
+        }
+
+        // ── Confirm Sample Click ──
+        document.getElementById('btn-confirm-sample').addEventListener('click', async () => {
+            if (!activeCandidateData) return;
+
+            const btn = document.getElementById('btn-confirm-sample');
+            btn.disabled = true;
+            btn.innerText = `⏳ Saving & Registering...`;
+
+            try {
+                const targetLat = activeCandidateData.lat !== undefined ? activeCandidateData.lat : currentLat;
+                const targetLng = activeCandidateData.lng !== undefined ? activeCandidateData.lng : currentLng;
+
+                const res = await fetch('/api/confirm', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image_hash: activeCandidateData.image_hash,
+                        suggested_class: activeCandidateData.suggested_class,
+                        description: activeCandidateData.description,
+                        box: activeCandidateData.box,
+                        confidence: activeCandidateData.confidence_val,
+                        filename: activeCandidateData.filename,
+                        trainingCandidateId: activeCandidateData.trainingCandidateId,
+                        lat: targetLat,
+                        lng: targetLng
+                    })
+                });
+                const resData = await res.json();
+
+                if (!res.ok) {
+                    throw new Error(resData.error || 'Confirmation failed');
+                }
+
+                const confirmedName = (resData.object && resData.object.name)
+                    ? resData.object.name
+                    : activeCandidateData.suggested_class.replace('-', ' ');
+
+                showToast(`🎉 Landmark confirmed! Added "${confirmedName}" to Dataset & Live Object Tracker.`);
+
+                // Switch UI to confirmed state
+                document.getElementById('unknown-result-box').style.display = 'none';
+                document.getElementById('known-result-box').style.display = 'block';
+                document.getElementById('known-badge').innerText = `🎯 Confirmed Custom Class (One-Shot Learned)`;
+                document.getElementById('known-landmark-title').innerText = `🏛️ ${confirmedName}`;
+                document.getElementById('known-confidence').innerText = `Registered in Custom Dataset & Live Tracker`;
+
+                // Reload Live Object Tracker buttons and map markers
+                await loadTrackerObjects(confirmedName);
+
+                // Auto-simulate walking to newly added landmark
+                if (resData.object && resData.object.latitude && resData.object.longitude) {
+                    moveTo(resData.object.latitude, resData.object.longitude, confirmedName);
+                }
+
+            } catch (err) {
+                showToast(`Failed to confirm sample: ${err.message}`);
+                btn.disabled = false;
+                btn.innerText = `✅ Confirm & Save Sample`;
+            }
+        });
+
+        // ── Reject Sample Click ──
+        document.getElementById('btn-reject-sample').addEventListener('click', async () => {
+            if (!activeCandidateData) return;
+
+            try {
+                await fetch('/api/reject', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        image_hash: activeCandidateData.image_hash,
+                        suggested_class: activeCandidateData.suggested_class,
+                        trainingCandidateId: activeCandidateData.trainingCandidateId
+                    })
+                });
+                showToast("Prediction rejected.");
+                document.getElementById('result-container').style.display = 'none';
+            } catch (err) {
+                showToast(`Failed to reject: ${err.message}`);
+            }
+        });
+    </script>
+</body>
+
+</html>
