@@ -1116,6 +1116,13 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                     'posts': serialize_mongo(posts)
                 }
                 
+        BACKGROUND_NOISE_CLASSES = {
+            'car', 'truck', 'bus', 'person', 'bicycle', 'motorcycle', 'traffic light', 
+            'stop sign', 'bench', 'parking meter', 'dog', 'cat', 'airplane', 'train', 
+            'boat', 'fire hydrant', 'bird', 'horse', 'sheep', 'cow', 'chair', 'sofa', 
+            'potted plant', 'bed', 'dining table', 'tv', 'laptop', 'cell phone'
+        }
+
         # 2. Run standard model prediction
         results = active_model.predict(source=img, save=False, verbose=False)
         inference_time = (time.time() - t0) * 1000
@@ -1123,22 +1130,32 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
         
         has_custom_detection = False
         detections = []
+        valid_boxes = []
+
         for box in result.boxes:
             conf = float(box.conf[0])
             if is_demo_active:
                 conf = max(0.01, min(0.99, conf + random.uniform(-0.02, 0.03)))
             if conf >= threshold:
-                has_custom_detection = True
                 cls_id = int(box.cls[0])
                 name = result.names[cls_id]
+                name_lower = name.lower().strip()
+                
+                # Filter out standard COCO background noise if not using custom-trained landmark model
+                if not is_custom_active and name_lower in BACKGROUND_NOISE_CLASSES:
+                    print(f"[NOISE-FILTER] Ignoring background COCO noise detection: '{name}' ({conf:.2%})")
+                    continue
+
+                has_custom_detection = True
+                valid_boxes.append(box)
                 detections.append({
                     'class': name,
                     'confidence': f"{conf:.2%}"
                 })
                 
-        if has_custom_detection:
-            # Match highest confidence detection with database
-            best_det = max(result.boxes, key=lambda b: float(b.conf[0]))
+        if has_custom_detection and valid_boxes:
+            # Match highest confidence valid landmark detection with database
+            best_det = max(valid_boxes, key=lambda b: float(b.conf[0]))
             cls_id = int(best_det.cls[0])
             cls_name = result.names[cls_id]
             
@@ -1179,8 +1196,17 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
             if matched_obj and "object_id" in matched_obj:
                 posts = list(db.posts.find({"object_id": matched_obj["object_id"]}))
                 
-            # Plot & Encode
-            annotated_img = result.plot()
+            # Plot only valid boxes on annotated image
+            annotated_img = img.copy()
+            h_img, w_img, _ = img.shape
+            for v_box in valid_boxes:
+                v_conf = float(v_box.conf[0])
+                v_cls = result.names[int(v_box.cls[0])]
+                x1, y1, x2, y2 = map(int, v_box.xyxy[0].tolist())
+                cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 3)
+                cv2.putText(annotated_img, f"{v_cls} ({v_conf:.2%})", (x1, y1 - 10),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+
             _, buffer = cv2.imencode('.jpg', annotated_img)
             encoded_image = base64.b64encode(buffer).decode('utf-8')
             
