@@ -414,8 +414,8 @@ latitude and longitude must be real decimal numbers (e.g. 48.8584, 2.2945) or nu
     b64_data = base64.b64encode(image_bytes).decode('utf-8')
     mime = mime_type if mime_type else "image/jpeg"
     
-    # 1. Try Direct REST endpoint with gemini-3.6-flash & gemini-2.5-flash
-    for model_name in ["gemini-3.6-flash", "gemini-2.5-flash"]:
+    # 1. Try Direct REST endpoint with available Gemini models
+    for model_name in ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-pro"]:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
             payload = {
