@@ -500,6 +500,98 @@
         }
         #canvas-snap { display: none; }
 
+        /* ── Gyroscope Test Panel ── */
+        #gyro-panel {
+            display: none;        /* shown via JS only on mobile */
+            margin-top: 18px;
+            background: rgba(168, 85, 247, 0.07);
+            border: 1px solid rgba(168, 85, 247, 0.3);
+            border-radius: 14px;
+            padding: 18px 20px;
+            position: relative;
+        }
+        #gyro-panel h4 {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--primary-purple);
+            margin-bottom: 14px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .gyro-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .gyro-cell {
+            background: rgba(168, 85, 247, 0.1);
+            border-radius: 10px;
+            padding: 10px 8px;
+            text-align: center;
+        }
+        .gyro-cell .gyro-label {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: 600;
+            letter-spacing: 0.05em;
+            margin-bottom: 4px;
+        }
+        .gyro-cell .gyro-val {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: var(--primary-purple);
+            font-variant-numeric: tabular-nums;
+        }
+        .gyro-cell .gyro-unit {
+            font-size: 0.65rem;
+            color: var(--text-muted);
+        }
+        .gyro-status {
+            font-size: 0.78rem;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+            min-height: 1.2em;
+        }
+        .btn-gyro-req {
+            width: 100%;
+            padding: 10px;
+            border-radius: 8px;
+            border: none;
+            background: linear-gradient(135deg, #a855f7 0%, #7c3aed 100%);
+            color: #fff;
+            font-weight: 700;
+            font-size: 0.88rem;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+        }
+        .btn-gyro-req:disabled { opacity: 0.45; cursor: not-allowed; }
+        .gyro-bar-row {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 6px;
+        }
+        .gyro-bar-label { font-size: 0.72rem; color: var(--text-muted); width: 26px; }
+        .gyro-bar-track {
+            flex: 1;
+            height: 6px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 3px;
+            overflow: hidden;
+        }
+        .gyro-bar-fill {
+            height: 100%;
+            border-radius: 3px;
+            transition: width 0.1s linear, background 0.3s;
+            background: var(--primary-purple);
+        }
+
         /* ── AI Analysis & Unknown Notice ── */
         .unknown-notice {
             background: rgba(245, 158, 11, 0.08);
@@ -1201,6 +1293,54 @@
 
                 </div>
 
+            </div>
+
+
+
+            <!-- ── Gyroscope Sensor Test Panel (Mobile Only) ── -->
+            <div id="gyro-panel">
+                <h4>🔄 Gyroscope / Orientation Sensor</h4>
+                <div class="gyro-status" id="gyro-status">Checking sensor support…</div>
+
+                <!-- Permission button — shown only on iOS Safari -->
+                <button class="btn-gyro-req" id="btn-gyro-req" style="display:none; margin-bottom:14px;">
+                    🔓 Grant Gyroscope Permission
+                </button>
+
+                <!-- Live value grid -->
+                <div class="gyro-grid" id="gyro-grid">
+                    <div class="gyro-cell">
+                        <div class="gyro-label">ALPHA (Z)</div>
+                        <div class="gyro-val" id="g-alpha">–</div>
+                        <div class="gyro-unit">° yaw</div>
+                    </div>
+                    <div class="gyro-cell">
+                        <div class="gyro-label">BETA (X)</div>
+                        <div class="gyro-val" id="g-beta">–</div>
+                        <div class="gyro-unit">° tilt fwd</div>
+                    </div>
+                    <div class="gyro-cell">
+                        <div class="gyro-label">GAMMA (Y)</div>
+                        <div class="gyro-val" id="g-gamma">–</div>
+                        <div class="gyro-unit">° tilt side</div>
+                    </div>
+                </div>
+
+                <!-- Visual bars -->
+                <div id="gyro-bars">
+                    <div class="gyro-bar-row">
+                        <span class="gyro-bar-label">α</span>
+                        <div class="gyro-bar-track"><div class="gyro-bar-fill" id="bar-alpha" style="width:50%"></div></div>
+                    </div>
+                    <div class="gyro-bar-row">
+                        <span class="gyro-bar-label">β</span>
+                        <div class="gyro-bar-track"><div class="gyro-bar-fill" id="bar-beta" style="width:50%"></div></div>
+                    </div>
+                    <div class="gyro-bar-row">
+                        <span class="gyro-bar-label">γ</span>
+                        <div class="gyro-bar-track"><div class="gyro-bar-fill" id="bar-gamma" style="width:50%"></div></div>
+                    </div>
+                </div>
             </div>
 
         </div>
@@ -2003,6 +2143,137 @@
                 showToast(`Failed to reject: ${err.message}`);
             }
         });
+
+        // ════════════════════════════════════════════════════════════════════
+        // ── Gyroscope / DeviceOrientation Sensor (Test Panel) ──
+        // Uses the DeviceOrientationEvent browser API (no npm packages).
+        // Cleans up the event listener when the panel is hidden.
+        // ════════════════════════════════════════════════════════════════════
+        (function initGyroPanel() {
+
+            const panel      = document.getElementById('gyro-panel');
+            const statusEl   = document.getElementById('gyro-status');
+            const reqBtn     = document.getElementById('btn-gyro-req');
+            const elAlpha    = document.getElementById('g-alpha');
+            const elBeta     = document.getElementById('g-beta');
+            const elGamma    = document.getElementById('g-gamma');
+            const barAlpha   = document.getElementById('bar-alpha');
+            const barBeta    = document.getElementById('bar-beta');
+            const barGamma   = document.getElementById('bar-gamma');
+
+            // Only show on mobile devices
+            const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            if (!isMobileDevice) return;
+
+            // DeviceOrientationEvent must exist
+            if (!window.DeviceOrientationEvent) {
+                panel.style.display = 'block';
+                statusEl.textContent = '⚠️ DeviceOrientationEvent not supported on this browser.';
+                return;
+            }
+
+            panel.style.display = 'block';
+
+            let _gyroListener = null;
+
+            function fmt(v) { return v !== null ? v.toFixed(1) : '–'; }
+
+            function pct(angle, range) {
+                // map angle within ±range to 0–100%
+                return Math.min(100, Math.max(0, ((angle + range) / (2 * range)) * 100));
+            }
+
+            function onOrientation(e) {
+                const alpha = e.alpha; // 0–360  compass / yaw
+                const beta  = e.beta;  // -180–180 front-back tilt
+                const gamma = e.gamma; // -90–90  left-right tilt
+
+                elAlpha.textContent = fmt(alpha);
+                elBeta.textContent  = fmt(beta);
+                elGamma.textContent = fmt(gamma);
+
+                if (alpha !== null) barAlpha.style.width = (alpha / 360 * 100).toFixed(1) + '%';
+                if (beta  !== null) barBeta.style.width  = pct(beta,  90).toFixed(1) + '%';
+                if (gamma !== null) barGamma.style.width = pct(gamma, 90).toFixed(1) + '%';
+
+                if (statusEl.textContent !== '✅ Sensor active — rotate your phone to see values change.') {
+                    statusEl.textContent = '✅ Sensor active — rotate your phone to see values change.';
+                    statusEl.style.color = '#10b981';
+                }
+            }
+
+            function startListening() {
+                if (_gyroListener) return; // already listening
+                _gyroListener = onOrientation;
+                window.addEventListener('deviceorientation', _gyroListener, true);
+                statusEl.textContent = '📡 Listening for orientation events…';
+            }
+
+            function stopListening() {
+                if (_gyroListener) {
+                    window.removeEventListener('deviceorientation', _gyroListener, true);
+                    _gyroListener = null;
+                }
+            }
+
+            // ── iOS Safari requires an explicit permission request ──────────
+            if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                // iOS 13+ — must be triggered by a user gesture
+                statusEl.textContent = '🔒 Tap the button below to grant gyroscope permission (iOS).';
+                reqBtn.style.display = 'flex';
+
+                reqBtn.addEventListener('click', async () => {
+                    reqBtn.disabled = true;
+                    try {
+                        const perm = await DeviceOrientationEvent.requestPermission();
+                        if (perm === 'granted') {
+                            reqBtn.style.display = 'none';
+                            startListening();
+                        } else {
+                            statusEl.textContent = '❌ Permission denied. Enable Motion & Orientation in Settings.';
+                            statusEl.style.color = '#f43f5e';
+                            reqBtn.disabled = false;
+                        }
+                    } catch (err) {
+                        statusEl.textContent = `❌ Error: ${err.message}`;
+                        statusEl.style.color = '#f43f5e';
+                        reqBtn.disabled = false;
+                    }
+                });
+
+            } else {
+                // Android / desktop — permission not needed, start immediately
+                // Fire a one-shot probe to detect if events are actually emitted
+                let probeTimer = null;
+                let probeReceived = false;
+
+                function probeHandler(e) {
+                    probeReceived = true;
+                    clearTimeout(probeTimer);
+                    window.removeEventListener('deviceorientation', probeHandler, true);
+                    startListening();
+                }
+
+                window.addEventListener('deviceorientation', probeHandler, true);
+                probeTimer = setTimeout(() => {
+                    window.removeEventListener('deviceorientation', probeHandler, true);
+                    if (!probeReceived) {
+                        statusEl.textContent = '⚠️ No orientation events received. Sensor may be unavailable.';
+                    }
+                }, 2500);
+            }
+
+            // ── Cleanup when page is hidden (battery-friendly) ───────────────
+            document.addEventListener('visibilitychange', () => {
+                if (document.hidden) {
+                    stopListening();
+                } else if (typeof DeviceOrientationEvent.requestPermission !== 'function') {
+                    startListening();
+                }
+            });
+
+        })(); // end initGyroPanel
+
     </script>
 </body>
 
