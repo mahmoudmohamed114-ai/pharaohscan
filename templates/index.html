@@ -500,6 +500,173 @@
         }
         #canvas-snap { display: none; }
 
+        /* ════════════════════════════════════════════════════════════════
+           AR Overlay — orientation-stabilized artifact badge
+           ════════════════════════════════════════════════════════════════ */
+        #ar-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 10000;
+            overflow: hidden;
+        }
+        #ar-overlay.active { display: block; }
+
+        /* Live camera feed background */
+        #ar-video {
+            position: absolute;
+            inset: 0;
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+        }
+
+        /* AR canvas — thin CSS 3-D plane for the artifact badge */
+        #ar-scene {
+            position: absolute;
+            inset: 0;
+            pointer-events: none;
+            /* Perspective gives the 3-D rotation effect */
+            perspective: 800px;
+        }
+
+        /* The virtual "world plane" that counter-rotates with the phone */
+        #ar-world-plane {
+            position: absolute;
+            inset: 0;
+            transform-style: preserve-3d;
+            transition: transform 0.05s linear;
+        }
+
+        /* The artifact badge pinned to the center of the world plane */
+        #ar-artifact-badge {
+            position: absolute;
+            left: 50%;
+            top: 50%;
+            transform: translate(-50%, -50%);
+            background: rgba(16, 185, 129, 0.18);
+            border: 2px solid rgba(16, 185, 129, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 18px;
+            padding: 18px 26px;
+            text-align: center;
+            max-width: 280px;
+            box-shadow: 0 0 40px rgba(16, 185, 129, 0.25);
+            animation: ar-pulse 2.5s ease-in-out infinite;
+            pointer-events: auto;
+        }
+        @keyframes ar-pulse {
+            0%, 100% { box-shadow: 0 0 40px rgba(16, 185, 129, 0.2); }
+            50%       { box-shadow: 0 0 60px rgba(16, 185, 129, 0.45); }
+        }
+        #ar-badge-icon   { font-size: 2.2rem; margin-bottom: 6px; }
+        #ar-badge-name   { font-size: 1.15rem; font-weight: 800; color: #fff; margin-bottom: 4px; }
+        #ar-badge-conf   { font-size: 0.8rem; color: #6ee7b7; font-weight: 600; }
+        #ar-badge-method { font-size: 0.72rem; color: rgba(255,255,255,0.5); margin-top: 2px; }
+
+        /* Orientation indicator in the corner */
+        #ar-orient-hud {
+            position: absolute;
+            bottom: 110px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.5);
+            border: 1px solid rgba(255,255,255,0.15);
+            border-radius: 10px;
+            padding: 8px 16px;
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.6);
+            display: flex;
+            gap: 14px;
+            backdrop-filter: blur(6px);
+        }
+        .ar-hud-val { font-variant-numeric: tabular-nums; }
+        .ar-hud-lbl { opacity: 0.55; font-size: 0.65rem; }
+
+        /* Tracking quality pill */
+        #ar-track-pill {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.55);
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 20px;
+            padding: 5px 14px;
+            font-size: 0.75rem;
+            color: #fff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            backdrop-filter: blur(6px);
+        }
+        #ar-track-dot {
+            width: 8px; height: 8px;
+            border-radius: 50%;
+            background: #f59e0b;
+            animation: blink 1s step-start infinite;
+        }
+        #ar-track-dot.tracking { background: #10b981; animation: none; }
+        @keyframes blink { 50% { opacity: 0; } }
+
+        /* Close button */
+        #ar-close-btn {
+            position: absolute;
+            top: 18px;
+            right: 18px;
+            background: rgba(0,0,0,0.55);
+            border: 1px solid rgba(255,255,255,0.2);
+            color: #fff;
+            border-radius: 50%;
+            width: 40px; height: 40px;
+            font-size: 1.1rem;
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer;
+            backdrop-filter: blur(6px);
+            pointer-events: auto;
+        }
+
+        /* Motion badge pulses when phone moves */
+        #ar-motion-badge {
+            position: absolute;
+            bottom: 165px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(99, 102, 241, 0.25);
+            border: 1px solid rgba(99, 102, 241, 0.5);
+            border-radius: 10px;
+            padding: 5px 12px;
+            font-size: 0.72rem;
+            color: rgba(255,255,255,0.7);
+            opacity: 0;
+            transition: opacity 0.4s;
+        }
+        #ar-motion-badge.active { opacity: 1; }
+
+        /* Enter AR button shown on known-result-box */
+        .btn-enter-ar {
+            width: 100%;
+            margin-top: 12px;
+            padding: 11px;
+            border-radius: 10px;
+            border: none;
+            background: linear-gradient(135deg, #10b981 0%, #0891b2 100%);
+            color: #fff;
+            font-weight: 700;
+            font-size: 0.92rem;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3);
+            transition: all 0.2s;
+        }
+        .btn-enter-ar:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(16, 185, 129, 0.45); }
+        .btn-enter-ar:active { transform: translateY(0); }
+
         /* ── Accelerometer Test Panel ── */
         #accel-panel {
             display: none;        /* shown via JS on mobile only */
@@ -2547,7 +2714,318 @@
 
         })(); // end initAccelPanel
 
+        // ════════════════════════════════════════════════════════════════════
+        // ── ARSession — Orientation-Stabilized Artifact Overlay ──
+        //
+        // Architecture:
+        //   Camera      → ar-video (live background)
+        //   Gyroscope   → DeviceOrientationEvent → counter-rotates ar-world-plane
+        //   Accelerometer → DeviceMotionEvent → detects shake/motion (HUD only)
+        //   Recognition → processDetectResult() → calls ARSession.load(artifact)
+        //
+        // What this IS:
+        //   An orientation-stabilized overlay. When the phone rotates,
+        //   the artifact badge counter-rotates slightly, creating a
+        //   "world-locked" visual feel.
+        //
+        // What this is NOT:
+        //   True spatial AR (SLAM / feature tracking). The badge is NOT
+        //   locked to a real 3-D point in space. True world-locking
+        //   requires WebXR (Android Chrome 81+) or a library like AR.js.
+        //   This architecture is designed to be upgraded to WebXR later.
+        // ════════════════════════════════════════════════════════════════════
+        const ARSession = (() => {
+
+            // ── State ──────────────────────────────────────────────────────
+            let _active        = false;
+            let _cameraStream  = null;
+            let _orientHandler = null;
+            let _motionHandler = null;
+            let _motionTimer   = null;
+
+            // Orientation reference captured at AR session start
+            let _refAlpha = null, _refBeta = null, _refGamma = null;
+            // Current orientation
+            let _curAlpha = 0, _curBeta = 0, _curGamma = 0;
+
+            // ── DOM handles (resolved lazily) ──────────────────────────────
+            function $id(id) { return document.getElementById(id); }
+
+            // ── Load an artifact into the AR badge ─────────────────────────
+            function load(artifactName, confidence, method) {
+                $id('ar-badge-name').textContent   = artifactName || '–';
+                $id('ar-badge-conf').textContent   = confidence   || '';
+                $id('ar-badge-method').textContent = method       ? `via ${method}` : '';
+            }
+
+            // ── Start AR session ───────────────────────────────────────────
+            async function start() {
+                if (_active) return;
+
+                // 1. Request rear camera
+                try {
+                    _cameraStream = await navigator.mediaDevices.getUserMedia({
+                        video: { facingMode: { ideal: 'environment' },
+                                 width: { ideal: 1920 }, height: { ideal: 1080 } },
+                        audio: false
+                    });
+                    const vid = $id('ar-video');
+                    vid.srcObject = _cameraStream;
+                    await vid.play().catch(() => {}); // some browsers auto-play
+                } catch (err) {
+                    showToast('📷 Camera required for AR mode. ' + err.message);
+                    return;
+                }
+
+                // 2. Show overlay
+                $id('ar-overlay').classList.add('active');
+                _active = true;
+
+                // 3. Reset reference orientation
+                _refAlpha = null; _refBeta = null; _refGamma = null;
+
+                // 4. Start orientation listener
+                _startOrientation();
+
+                // 5. Start motion listener (motion awareness only)
+                _startMotion();
+
+                // 6. Bind close button
+                $id('ar-close-btn').onclick = stop;
+            }
+
+            // ── Stop AR session ────────────────────────────────────────────
+            function stop() {
+                if (!_active) return;
+                $id('ar-overlay').classList.remove('active');
+                _active = false;
+
+                if (_cameraStream) {
+                    _cameraStream.getTracks().forEach(t => t.stop());
+                    _cameraStream = null;
+                }
+                $id('ar-video').srcObject = null;
+
+                _stopOrientation();
+                _stopMotion();
+                clearTimeout(_motionTimer);
+            }
+
+            // ── Orientation (Gyroscope) ────────────────────────────────────
+            function _startOrientation() {
+                if (_orientHandler) return;
+
+                function requestAndListen() {
+                    _orientHandler = _onOrientation;
+                    window.addEventListener('deviceorientation', _orientHandler, true);
+                }
+
+                if (typeof DeviceOrientationEvent.requestPermission === 'function') {
+                    // iOS 13+
+                    DeviceOrientationEvent.requestPermission()
+                        .then(perm => {
+                            if (perm === 'granted') requestAndListen();
+                            else _setTrackLabel('⚠️ Orientation permission denied', false);
+                        })
+                        .catch(() => _setTrackLabel('⚠️ Orientation unavailable', false));
+                } else {
+                    requestAndListen();
+                }
+            }
+
+            function _stopOrientation() {
+                if (_orientHandler) {
+                    window.removeEventListener('deviceorientation', _orientHandler, true);
+                    _orientHandler = null;
+                }
+            }
+
+            function _onOrientation(e) {
+                const alpha = e.alpha, beta = e.beta, gamma = e.gamma;
+                if (alpha === null) return;
+
+                // Capture reference on first event
+                if (_refAlpha === null) {
+                    _refAlpha = alpha; _refBeta = beta; _refGamma = gamma;
+                    _setTrackLabel('✅ Orientation tracking active', true);
+                }
+
+                _curAlpha = alpha; _curBeta = beta; _curGamma = gamma;
+
+                // Delta from reference orientation (in degrees)
+                const dAlpha = _angleDelta(alpha, _refAlpha); // yaw
+                const dBeta  = beta  - _refBeta;              // tilt front/back
+                const dGamma = gamma - _refGamma;             // tilt left/right
+
+                // Counter-rotate the world plane opposite to phone movement.
+                // Scale factor < 1 so the badge moves subtly, not 1:1.
+                const SCALE = 0.35;
+                const plane = $id('ar-world-plane');
+                if (plane) {
+                    plane.style.transform =
+                        `rotateX(${(-dBeta  * SCALE).toFixed(2)}deg) ` +
+                        `rotateY(${( dGamma * SCALE).toFixed(2)}deg) ` +
+                        `rotateZ(${(-dAlpha * SCALE).toFixed(2)}deg)`;
+                }
+
+                // Update HUD
+                const fmt = v => v !== null ? v.toFixed(1) : '–';
+                const ha = $id('ar-hud-alpha'), hb = $id('ar-hud-beta'), hg = $id('ar-hud-gamma');
+                if (ha) ha.textContent = fmt(alpha);
+                if (hb) hb.textContent = fmt(beta);
+                if (hg) hg.textContent = fmt(gamma);
+            }
+
+            // Shortest angular distance on a 0-360 circle
+            function _angleDelta(a, ref) {
+                let d = a - ref;
+                if (d > 180) d -= 360;
+                if (d < -180) d += 360;
+                return d;
+            }
+
+            // ── Motion (Accelerometer) ─────────────────────────────────────
+            // Motion data is used ONLY to show the "motion detected" badge.
+            // It does NOT directly reposition the artifact — doing so without
+            // SLAM/dead-reckoning would cause rapid drift.
+            function _startMotion() {
+                if (_motionHandler) return;
+
+                function requestAndListen() {
+                    _motionHandler = _onMotion;
+                    window.addEventListener('devicemotion', _motionHandler, true);
+                }
+
+                if (typeof DeviceMotionEvent.requestPermission === 'function') {
+                    DeviceMotionEvent.requestPermission()
+                        .then(p => { if (p === 'granted') requestAndListen(); })
+                        .catch(() => {});
+                } else {
+                    requestAndListen();
+                }
+            }
+
+            function _stopMotion() {
+                if (_motionHandler) {
+                    window.removeEventListener('devicemotion', _motionHandler, true);
+                    _motionHandler = null;
+                }
+            }
+
+            function _onMotion(e) {
+                const ag = e.accelerationIncludingGravity || {};
+                const x  = ag.x || 0, y = ag.y || 0, z = ag.z || 0;
+                const magnitude = Math.sqrt(x * x + y * y + z * z);
+
+                // Flash "Motion detected" badge on significant movement (> 3 m/s²)
+                if (magnitude > 3) {
+                    const badge = $id('ar-motion-badge');
+                    if (badge) {
+                        badge.classList.add('active');
+                        clearTimeout(_motionTimer);
+                        _motionTimer = setTimeout(() => badge.classList.remove('active'), 600);
+                    }
+                }
+            }
+
+            // ── Helpers ────────────────────────────────────────────────────
+            function _setTrackLabel(text, tracking) {
+                const lbl = $id('ar-track-label');
+                const dot = $id('ar-track-dot');
+                if (lbl) lbl.textContent = text;
+                if (dot) dot.classList.toggle('tracking', !!tracking);
+            }
+
+            // ── Public API ─────────────────────────────────────────────────
+            return { start, stop, load };
+
+        })();
+
+        // ── Hook: inject "Enter AR" button after successful recognition ────
+        // We wrap processDetectResult to add the button without modifying the
+        // original recognition code.
+        const _origProcessDetectResult = processDetectResult;
+        function processDetectResult(data) {
+            // Call original first (preserves all existing behavior)
+            _origProcessDetectResult(data);
+
+            // On mobile only: inject "Enter AR View" button after detection
+            const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+            const hasCamera      = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+            if (!isMobileDevice || !hasCamera) return;
+
+            // Determine recognized artifact name and confidence
+            let artifactName = null, confidence = null, method = null;
+            if (data && !data.unknown && data.detections && data.detections.length > 0) {
+                artifactName = data.detections[0].class;
+                confidence   = data.detections[0].confidence;
+                method       = data.recognition_method || 'YOLO';
+            } else if (data && data.gemini && data.gemini.possibleLandmark &&
+                       data.gemini.possibleLandmark !== 'Unknown') {
+                artifactName = data.gemini.possibleLandmark;
+                confidence   = (data.gemini.confidence || 80) + '%';
+                method       = 'Gemini Zero-Shot';
+            }
+            if (!artifactName) return;
+
+            // Preload artifact into AR badge
+            ARSession.load(artifactName, confidence, method);
+
+            // Inject the "Enter AR" button into the result card (once only)
+            const knownBox = document.getElementById('known-result-box');
+            if (knownBox && !knownBox.querySelector('.btn-enter-ar')) {
+                const btn = document.createElement('button');
+                btn.className = 'btn-enter-ar';
+                btn.innerHTML = '🔭 Enter AR View';
+                btn.onclick = () => ARSession.start();
+                knownBox.appendChild(btn);
+            }
+        }
+
     </script>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         AR Overlay — orientation-stabilized artifact badge
+         Hidden by default; activated by ARSession.start()
+         ════════════════════════════════════════════════════════════════ -->
+    <div id="ar-overlay">
+
+        <!-- Live camera feed -->
+        <video id="ar-video" autoplay playsinline muted></video>
+
+        <!-- 3-D scene layer -->
+        <div id="ar-scene">
+            <div id="ar-world-plane">
+                <div id="ar-artifact-badge">
+                    <div id="ar-badge-icon">🏛️</div>
+                    <div id="ar-badge-name">–</div>
+                    <div id="ar-badge-conf">–</div>
+                    <div id="ar-badge-method"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Tracking quality indicator -->
+        <div id="ar-track-pill">
+            <div id="ar-track-dot"></div>
+            <span id="ar-track-label">Initializing orientation…</span>
+        </div>
+
+        <!-- Motion indicator -->
+        <div id="ar-motion-badge">📳 Motion detected</div>
+
+        <!-- Orientation HUD -->
+        <div id="ar-orient-hud">
+            <span><span class="ar-hud-lbl">α&nbsp;</span><span class="ar-hud-val" id="ar-hud-alpha">–</span>°</span>
+            <span><span class="ar-hud-lbl">β&nbsp;</span><span class="ar-hud-val" id="ar-hud-beta">–</span>°</span>
+            <span><span class="ar-hud-lbl">γ&nbsp;</span><span class="ar-hud-val" id="ar-hud-gamma">–</span>°</span>
+        </div>
+
+        <!-- Close button -->
+        <button id="ar-close-btn" title="Exit AR">✕</button>
+
+    </div>
+
 </body>
 
 </html>
