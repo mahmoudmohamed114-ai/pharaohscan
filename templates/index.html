@@ -408,6 +408,98 @@
             transform: none;
         }
 
+        /* ── Camera Button ── */
+        .btn-camera {
+            width: 100%;
+            margin-top: 10px;
+            background: linear-gradient(135deg, #6366f1 0%, #4f46e5 100%);
+            color: #fff;
+            border: none;
+            padding: 12px 14px;
+            border-radius: 10px;
+            font-weight: 700;
+            font-size: 0.95rem;
+            cursor: pointer;
+            transition: all 0.2s;
+            box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+        }
+        .btn-camera:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 20px rgba(99, 102, 241, 0.45);
+        }
+        .btn-camera:active { transform: translateY(0); }
+
+        /* ── Camera Overlay ── */
+        #camera-overlay {
+            display: none;
+            position: fixed;
+            inset: 0;
+            background: #000;
+            z-index: 9999;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #camera-overlay.active { display: flex; }
+        #camera-video {
+            width: 100%;
+            max-height: 80vh;
+            object-fit: cover;
+            border-radius: 0;
+        }
+        .camera-controls {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            padding: 20px 24px 36px;
+            background: linear-gradient(to top, rgba(0,0,0,0.85) 0%, transparent 100%);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+        .btn-snap {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            background: #fff;
+            border: 5px solid rgba(255,255,255,0.4);
+            cursor: pointer;
+            transition: transform 0.15s;
+            box-shadow: 0 4px 20px rgba(0,0,0,0.5);
+            flex-shrink: 0;
+        }
+        .btn-snap:active { transform: scale(0.92); }
+        .btn-cancel-camera {
+            background: rgba(255,255,255,0.15);
+            color: #fff;
+            border: 1px solid rgba(255,255,255,0.3);
+            padding: 10px 20px;
+            border-radius: 8px;
+            font-size: 0.9rem;
+            font-weight: 600;
+            cursor: pointer;
+            backdrop-filter: blur(6px);
+        }
+        .camera-hint {
+            position: absolute;
+            top: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.55);
+            color: #fff;
+            font-size: 0.82rem;
+            padding: 6px 14px;
+            border-radius: 20px;
+            white-space: nowrap;
+            pointer-events: none;
+        }
+        #canvas-snap { display: none; }
+
         /* ── AI Analysis & Unknown Notice ── */
         .unknown-notice {
             background: rgba(245, 158, 11, 0.08);
@@ -1006,6 +1098,11 @@
                     <input type="file" id="file-input" accept="image/*" style="display: none;">
                 </div>
 
+                <!-- ── Camera Button (shown on mobile only via JS) ── -->
+                <button class="btn-camera" id="btn-camera" style="display:none;">
+                    📸 Take Photo with Camera
+                </button>
+
                 <button class="btn-detect" id="btn-detect" disabled>
                     🏛️ Detect & Find Posts
                 </button>
@@ -1526,6 +1623,79 @@
             };
             reader.readAsDataURL(file);
         }
+
+        // ── Camera Capture (Mobile) ──
+        const btnCamera = document.getElementById('btn-camera');
+        const isMobile = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        const hasCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+
+        if (isMobile && hasCamera) {
+            btnCamera.style.display = 'flex';
+        }
+
+        // Inject camera overlay HTML dynamically (keeps the template clean)
+        const cameraOverlayHTML = `
+            <div id="camera-overlay">
+                <span class="camera-hint">Point at the landmark &amp; press the button</span>
+                <video id="camera-video" autoplay playsinline muted></video>
+                <canvas id="canvas-snap"></canvas>
+                <div class="camera-controls">
+                    <button class="btn-cancel-camera" id="btn-cancel-camera">✕ Cancel</button>
+                    <button class="btn-snap" id="btn-snap" title="Take Photo"></button>
+                    <div style="width:80px"></div>
+                </div>
+            </div>`;
+        document.body.insertAdjacentHTML('beforeend', cameraOverlayHTML);
+
+        let _cameraStream = null;
+
+        async function openCamera() {
+            const overlay = document.getElementById('camera-overlay');
+            const video = document.getElementById('camera-video');
+            try {
+                _cameraStream = await navigator.mediaDevices.getUserMedia({
+                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+                    audio: false
+                });
+                video.srcObject = _cameraStream;
+                overlay.classList.add('active');
+            } catch (err) {
+                let msg = '📷 Camera access denied.';
+                if (err.name === 'NotFoundError') msg = '📷 No camera found on this device.';
+                else if (err.name === 'NotAllowedError') msg = '📷 Camera permission denied. Please allow camera access in your browser settings.';
+                showToast(msg);
+            }
+        }
+
+        function closeCamera() {
+            const overlay = document.getElementById('camera-overlay');
+            const video = document.getElementById('camera-video');
+            overlay.classList.remove('active');
+            if (_cameraStream) {
+                _cameraStream.getTracks().forEach(t => t.stop());
+                _cameraStream = null;
+            }
+            video.srcObject = null;
+        }
+
+        function snapPhoto() {
+            const video = document.getElementById('camera-video');
+            const canvas = document.getElementById('canvas-snap');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            canvas.getContext('2d').drawImage(video, 0, 0);
+            canvas.toBlob((blob) => {
+                closeCamera();
+                const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
+                handleFile(file); // ← feeds into existing recognition flow
+            }, 'image/jpeg', 0.92);
+        }
+
+        btnCamera.addEventListener('click', openCamera);
+        document.addEventListener('click', (e) => {
+            if (e.target.id === 'btn-cancel-camera') closeCamera();
+            if (e.target.id === 'btn-snap') snapPhoto();
+        });
 
         btnDetect.addEventListener('click', async () => {
             if (!selectedFile) return;
