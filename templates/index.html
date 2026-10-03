@@ -1462,6 +1462,47 @@
                     <img id="preview-image" src="" alt="Landmark Preview">
                 </div>
 
+                <!-- ── Locked Sensor Pose Anchor Card (Captured at Photo Snap) ── -->
+                <div id="captured-sensor-card" style="display: none; margin-top: 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 12px; padding: 12px 16px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                        <span style="font-size: 0.82rem; font-weight: 700; color: #10b981; display: flex; align-items: center; gap: 6px;">
+                            🔒 Photo Capture Sensor Anchor (Locked)
+                        </span>
+                        <span id="captured-sensor-time" style="font-size: 0.72rem; color: var(--text-muted);"></span>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 0.75rem; text-align: center; margin-bottom: 6px;">
+                        <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
+                            <div style="color: var(--text-muted); font-size: 0.68rem;">GYRO α (Yaw)</div>
+                            <div id="cap-gyro-alpha" style="font-weight: 700; color: #6ee7b7; font-size: 0.9rem;">0.0°</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
+                            <div style="color: var(--text-muted); font-size: 0.68rem;">GYRO β (Pitch)</div>
+                            <div id="cap-gyro-beta" style="font-weight: 700; color: #6ee7b7; font-size: 0.9rem;">0.0°</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
+                            <div style="color: var(--text-muted); font-size: 0.68rem;">GYRO γ (Roll)</div>
+                            <div id="cap-gyro-gamma" style="font-weight: 700; color: #6ee7b7; font-size: 0.9rem;">0.0°</div>
+                        </div>
+                    </div>
+                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 0.75rem; text-align: center;">
+                        <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
+                            <div style="color: var(--text-muted); font-size: 0.68rem;">ACCEL X</div>
+                            <div id="cap-accel-x" style="font-weight: 700; color: #93c5fd; font-size: 0.85rem;">0.00</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
+                            <div style="color: var(--text-muted); font-size: 0.68rem;">ACCEL Y</div>
+                            <div id="cap-accel-y" style="font-weight: 700; color: #93c5fd; font-size: 0.85rem;">0.00</div>
+                        </div>
+                        <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
+                            <div style="color: var(--text-muted); font-size: 0.68rem;">ACCEL Z</div>
+                            <div id="cap-accel-z" style="font-weight: 700; color: #93c5fd; font-size: 0.85rem;">0.00</div>
+                        </div>
+                    </div>
+                    <div style="font-size: 0.68rem; color: rgba(255,255,255,0.5); margin-top: 6px; text-align: center;">
+                        ⚓ Sensor aspects frozen at capture time &amp; retained across photo changes
+                    </div>
+                </div>
+
                 <!-- ── Result Container ── -->
                 <div id="result-container" style="display: none;">
 
@@ -2057,6 +2098,69 @@
             }
         });
 
+        // ── Global Sensors & Photo Capture Pose Anchor ──
+        window.liveGyro = { alpha: 0, beta: 0, gamma: 0 };
+        window.liveAccel = { x: 0, y: 0, z: 0 };
+        window.capturedPhotoSensors = null;
+
+        function updateGlobalOrientation(alpha, beta, gamma) {
+            if (alpha !== null && alpha !== undefined) {
+                window.liveGyro = {
+                    alpha: parseFloat(Number(alpha).toFixed(2)),
+                    beta: parseFloat(Number(beta).toFixed(2)),
+                    gamma: parseFloat(Number(gamma).toFixed(2))
+                };
+            }
+        }
+
+        function updateGlobalMotion(x, y, z) {
+            window.liveAccel = {
+                x: parseFloat(Number(x || 0).toFixed(2)),
+                y: parseFloat(Number(y || 0).toFixed(2)),
+                z: parseFloat(Number(z || 0).toFixed(2))
+            };
+        }
+
+        // Global passive listeners so orientation & acceleration are available immediately
+        if (window.DeviceOrientationEvent) {
+            window.addEventListener('deviceorientation', (e) => {
+                if (e.alpha !== null) updateGlobalOrientation(e.alpha, e.beta, e.gamma);
+            }, true);
+        }
+        if (window.DeviceMotionEvent) {
+            window.addEventListener('devicemotion', (e) => {
+                const ag = e.accelerationIncludingGravity || {};
+                const a = e.acceleration || {};
+                const x = (a.x !== null && a.x !== undefined) ? a.x : (ag.x ?? 0);
+                const y = (a.y !== null && a.y !== undefined) ? a.y : (ag.y ?? 0);
+                const z = (a.z !== null && a.z !== undefined) ? a.z : (ag.z ?? 0);
+                updateGlobalMotion(x, y, z);
+            }, true);
+        }
+
+        function renderCapturedSensorsCard() {
+            const card = document.getElementById('captured-sensor-card');
+            if (!card || !window.capturedPhotoSensors) return;
+            const s = window.capturedPhotoSensors;
+            const fmt = (v, d = 1) => (v !== null && v !== undefined) ? Number(v).toFixed(d) : '0.0';
+            const elA = document.getElementById('cap-gyro-alpha');
+            const elB = document.getElementById('cap-gyro-beta');
+            const elG = document.getElementById('cap-gyro-gamma');
+            const elX = document.getElementById('cap-accel-x');
+            const elY = document.getElementById('cap-accel-y');
+            const elZ = document.getElementById('cap-accel-z');
+            const elT = document.getElementById('captured-sensor-time');
+
+            if (elA) elA.textContent = fmt(s.alpha, 1) + '°';
+            if (elB) elB.textContent = fmt(s.beta, 1) + '°';
+            if (elG) elG.textContent = fmt(s.gamma, 1) + '°';
+            if (elX) elX.textContent = fmt(s.x, 2);
+            if (elY) elY.textContent = fmt(s.y, 2);
+            if (elZ) elZ.textContent = fmt(s.z, 2);
+            if (elT) elT.textContent = 'Captured: ' + (s.timestamp || '');
+            card.style.display = 'block';
+        }
+
         function handleFile(file) {
             selectedFile = file;
             const reader = new FileReader();
@@ -2065,6 +2169,11 @@
                 previewBox.style.display = 'flex';
                 btnDetect.disabled = false;
                 document.getElementById('result-container').style.display = 'none';
+
+                // Keep the captured sensor aspects locked and displayed even when changing the photo
+                if (window.capturedPhotoSensors && window.capturedPhotoSensors.locked) {
+                    renderCapturedSensorsCard();
+                }
             };
             reader.readAsDataURL(file);
         }
@@ -2129,10 +2238,28 @@
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
+
+            // ── Freeze gyroscope and accelerometer aspects at this exact millisecond ──
+            const gyro = window.liveGyro || { alpha: 0, beta: 0, gamma: 0 };
+            const accel = window.liveAccel || { x: 0, y: 0, z: 0 };
+
+            window.capturedPhotoSensors = {
+                alpha: gyro.alpha ?? 0,
+                beta: gyro.beta ?? 0,
+                gamma: gyro.gamma ?? 0,
+                x: accel.x ?? 0,
+                y: accel.y ?? 0,
+                z: accel.z ?? 0,
+                timestamp: new Date().toLocaleTimeString(),
+                locked: true
+            };
+
+            renderCapturedSensorsCard();
+
             canvas.toBlob((blob) => {
                 closeCamera();
                 const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
-                handleFile(file); // ← feeds into existing recognition flow
+                handleFile(file); // feeds into existing recognition flow
             }, 'image/jpeg', 0.92);
         }
 
@@ -2153,6 +2280,16 @@
             formData.append('model', 'yolov8');
             formData.append('lat', currentLat);
             formData.append('lng', currentLng);
+
+            // Forward locked sensor pose if captured from camera
+            if (window.capturedPhotoSensors && window.capturedPhotoSensors.locked) {
+                formData.append('gyro_alpha', window.capturedPhotoSensors.alpha);
+                formData.append('gyro_beta', window.capturedPhotoSensors.beta);
+                formData.append('gyro_gamma', window.capturedPhotoSensors.gamma);
+                formData.append('accel_x', window.capturedPhotoSensors.x);
+                formData.append('accel_y', window.capturedPhotoSensors.y);
+                formData.append('accel_z', window.capturedPhotoSensors.z);
+            }
 
             try {
                 // Step 1: POST image → get job_id immediately
@@ -2365,6 +2502,11 @@
                     showToast(`Found social posts for ${det.class}!`);
                 }
             }
+
+            // Hook AR view button on recognized result
+            if (typeof attachARToResult === 'function') {
+                attachARToResult(data);
+            }
         }
 
         // ── Confirm Sample Click ──
@@ -2496,6 +2638,8 @@
                 elAlpha.textContent = fmt(alpha);
                 elBeta.textContent  = fmt(beta);
                 elGamma.textContent = fmt(gamma);
+
+                updateGlobalOrientation(alpha, beta, gamma);
 
                 if (alpha !== null) barAlpha.style.width = (alpha / 360 * 100).toFixed(1) + '%';
                 if (beta  !== null) barBeta.style.width  = pct(beta,  90).toFixed(1) + '%';
@@ -2632,6 +2776,8 @@
                 elX.textContent = fmt(x);
                 elY.textContent = fmt(y);
                 elZ.textContent = fmt(z);
+
+                updateGlobalMotion(x, y, z);
 
                 const RANGE = 20; // ±20 m/s²
                 if (x !== null) barX.style.width = pct(x, RANGE).toFixed(1) + '%';
@@ -2781,8 +2927,14 @@
                 $id('ar-overlay').classList.add('active');
                 _active = true;
 
-                // 3. Reset reference orientation
-                _refAlpha = null; _refBeta = null; _refGamma = null;
+                // 3. Reset reference orientation or use locked photo capture anchor
+                if (window.capturedPhotoSensors && window.capturedPhotoSensors.locked) {
+                    _refAlpha = window.capturedPhotoSensors.alpha;
+                    _refBeta  = window.capturedPhotoSensors.beta;
+                    _refGamma = window.capturedPhotoSensors.gamma;
+                } else {
+                    _refAlpha = null; _refBeta = null; _refGamma = null;
+                }
 
                 // 4. Start orientation listener
                 _startOrientation();
@@ -2844,10 +2996,17 @@
                 const alpha = e.alpha, beta = e.beta, gamma = e.gamma;
                 if (alpha === null) return;
 
-                // Capture reference on first event
+                // Capture reference on first event if not set from photo capture
                 if (_refAlpha === null) {
-                    _refAlpha = alpha; _refBeta = beta; _refGamma = gamma;
-                    _setTrackLabel('✅ Orientation tracking active', true);
+                    if (window.capturedPhotoSensors && window.capturedPhotoSensors.locked) {
+                        _refAlpha = window.capturedPhotoSensors.alpha;
+                        _refBeta  = window.capturedPhotoSensors.beta;
+                        _refGamma = window.capturedPhotoSensors.gamma;
+                        _setTrackLabel('✅ Locked Photo Pose tracking active', true);
+                    } else {
+                        _refAlpha = alpha; _refBeta = beta; _refGamma = gamma;
+                        _setTrackLabel('✅ Orientation tracking active', true);
+                    }
                 }
 
                 _curAlpha = alpha; _curBeta = beta; _curGamma = gamma;
@@ -2941,14 +3100,8 @@
 
         })();
 
-        // ── Hook: inject "Enter AR" button after successful recognition ────
-        // We wrap processDetectResult to add the button without modifying the
-        // original recognition code.
-        const _origProcessDetectResult = processDetectResult;
-        function processDetectResult(data) {
-            // Call original first (preserves all existing behavior)
-            _origProcessDetectResult(data);
-
+        // ── Helper: inject "Enter AR" button after successful recognition ────
+        function attachARToResult(data) {
             // On mobile only: inject "Enter AR View" button after detection
             const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
             const hasCamera      = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);

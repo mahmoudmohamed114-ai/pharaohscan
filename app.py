@@ -562,6 +562,8 @@ def serialize_mongo(data):
         for k, v in data.items():
             if isinstance(v, ObjectId):
                 new_dict[k] = str(v)
+            elif isinstance(v, (datetime.datetime, datetime.date)):
+                new_dict[k] = v.isoformat()
             elif isinstance(v, dict) and "$oid" in v:
                 new_dict[k] = str(v["$oid"])
             elif isinstance(v, dict) and "$date" in v:
@@ -569,6 +571,8 @@ def serialize_mongo(data):
             else:
                 new_dict[k] = serialize_mongo(v)
         return new_dict
+    if isinstance(data, (datetime.datetime, datetime.date)):
+        return data.isoformat()
     return data
 
 # ─── Mock Description Database for Zero-Shot Offline Fallback ──────────────────
@@ -1758,9 +1762,13 @@ def api_patch_candidate(id):
 @app.route('/api/simulate/move', methods=['POST'])
 def api_simulate_move():
     try:
-        data = request.get_json()
-        lat = float(data.get('lat'))
-        lng = float(data.get('lng'))
+        data = request.get_json() or {}
+        try:
+            lat = float(data.get('lat', 29.9792))
+            lng = float(data.get('lng', 31.1342))
+        except (ValueError, TypeError):
+            lat = 29.9792
+            lng = 31.1342
         user_id = data.get('userId', 'demo-user')
         prev_obj_id = data.get('previousObjectId')
         requested_obj_id = data.get('requestedObjectId')  # Explicit object chosen by user
@@ -1782,11 +1790,16 @@ def api_simulate_move():
         nearest_dist = float('inf')
         
         for obj in candidates:
-            dist = haversine_meters(lat, lng, obj["latitude"], obj["longitude"])
-            radius = obj.get("radius_m", 80)
-            if dist <= radius and dist < nearest_dist:
-                nearest = obj
-                nearest_dist = dist
+            try:
+                obj_lat = float(obj["latitude"])
+                obj_lng = float(obj["longitude"])
+                dist = haversine_meters(lat, lng, obj_lat, obj_lng)
+                radius = float(obj.get("radius_m", 80))
+                if dist <= radius and dist < nearest_dist:
+                    nearest = obj
+                    nearest_dist = dist
+            except Exception:
+                continue
 
         # Prefer explicit selection over geofence result
         active_obj = explicit_obj if explicit_obj else nearest
