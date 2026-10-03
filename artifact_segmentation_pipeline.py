@@ -3,6 +3,22 @@ Artifact Segmentation Pipeline
 Specialized Instance Segmentation & Recognition for Museum Artifacts & Jewelry.
 """
 import os
+import sys
+import gc
+
+# ── Force single-threading for OpenMP / BLAS to avoid eventlet deadlocks & CPU exhaustion ──
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+
+try:
+    import torch
+    torch.set_num_threads(1)
+except Exception:
+    pass
+
 import cv2
 import numpy as np
 import json
@@ -35,15 +51,28 @@ class ArtifactSegmentationPipeline:
 
     def _load_model(self):
         try:
+            try:
+                import torch
+                torch.set_num_threads(1)
+            except Exception:
+                pass
             from ultralytics import FastSAM
             candidates = [
                 os.path.join(os.path.dirname(__file__), "models", self.model_name),
                 os.path.join(os.path.dirname(__file__), self.model_name),
                 self.model_name
             ]
-            path = next((p for p in candidates if os.path.exists(p)), self.model_name)
-            print(f"[PIPELINE] Initializing FastSAM model: {path}")
-            self.model = FastSAM(path)
+            path = next((p for p in candidates if os.path.exists(p)), None)
+            if path:
+                print(f"[PIPELINE] Initializing FastSAM model: {path}")
+                self.model = FastSAM(path)
+            else:
+                seg_path = os.path.join(os.path.dirname(__file__), "models", "yolov8n-seg.pt")
+                if os.path.exists(seg_path):
+                    from ultralytics import YOLO
+                    self.model = YOLO(seg_path)
+                else:
+                    self.model = None
         except Exception as e:
             print(f"[PIPELINE] FastSAM fallback to YOLOv8-seg: {e}")
             try:
@@ -58,24 +87,40 @@ class ArtifactSegmentationPipeline:
 
     def segment_instances(self, img_bgr: np.ndarray) -> List[Dict]:
         """
-        Runs instance segmentation.
-        Returns a list of instances, each with:
-          - 'bbox': [x1, y1, x2, y2]
-          - 'mask': 2D binary uint8 mask (0 or 255) of full image shape
-          - 'raw_conf': float
+        Runs instance segmentation with memory caps, single-thread safety,
+        and instant fallback to adaptive archaeological segmentation.
         """
         h_img, w_img = img_bgr.shape[:2]
         instances = []
 
         if self.model is not None:
             try:
+                try:
+                    import torch
+                    torch.set_num_threads(1)
+                except Exception:
+                    pass
+
+                # Cap inference resolution to max 640px for low RAM consumption on cloud hosts
+                max_infer_dim = 640
+                if max(h_img, w_img) > max_infer_dim:
+                    scale = max_infer_dim / float(max(h_img, w_img))
+                    infer_w = int(round(w_img * scale))
+                    infer_h = int(round(h_img * scale))
+                    infer_img = cv2.resize(img_bgr, (infer_w, infer_h), interpolation=cv2.INTER_AREA)
+                else:
+                    scale = 1.0
+                    infer_img = img_bgr
+                    infer_w, infer_h = w_img, h_img
+
                 results = self.model.predict(
-                    source=img_bgr,
+                    source=infer_img,
                     device='cpu',
-                    retina_masks=True,
-                    imgsz=max(640, min(1024, max(h_img, w_img))),
+                    retina_masks=False,  # huge RAM savings on cloud servers
+                    imgsz=max(320, min(640, max(infer_w, infer_h))),
                     conf=self.conf_thresh,
-                    iou=0.7,
+                    iou=0.6,
+                    max_det=25,
                     verbose=False
                 )[0]
 
@@ -96,9 +141,14 @@ class ArtifactSegmentationPipeline:
                         if area < (h_img * w_img * 0.0008):
                             continue
 
-                        # Check bounding box
+                        # Rescale bounding box to original image coordinates
                         if idx < len(boxes):
-                            x1, y1, x2, y2 = [int(round(v)) for v in boxes[idx]]
+                            raw_box = boxes[idx]
+                            inv_scale = 1.0 / scale
+                            x1 = int(round(raw_box[0] * inv_scale))
+                            y1 = int(round(raw_box[1] * inv_scale))
+                            x2 = int(round(raw_box[2] * inv_scale))
+                            y2 = int(round(raw_box[3] * inv_scale))
                         else:
                             ys, xs = np.where(bin_mask > 0)
                             x1, y1, x2, y2 = int(xs.min()), int(ys.min()), int(xs.max()), int(ys.max())
@@ -114,8 +164,13 @@ class ArtifactSegmentationPipeline:
                             'mask': bin_mask,
                             'raw_conf': conf
                         })
+
+                del results
+                gc.collect()
+
             except Exception as e:
                 print(f"[PIPELINE] Model prediction exception: {e}")
+                instances = []
 
         # If model returned no instances (or synthetic background without COCO classes),
         # run museum adaptive saliency & morphological instance segmentation
@@ -320,6 +375,14 @@ class ArtifactSegmentationPipeline:
             img_bgr = input_image_or_path.copy()
 
         h_img, w_img = img_bgr.shape[:2]
+        # Memory-safety cap: limit to 1280px max dimension on cloud hosts
+        max_proc = 1280
+        if max(h_img, w_img) > max_proc:
+            down_scale = max_proc / float(max(h_img, w_img))
+            new_w = int(round(w_img * down_scale))
+            new_h = int(round(h_img * down_scale))
+            img_bgr = cv2.resize(img_bgr, (new_w, new_h), interpolation=cv2.INTER_AREA)
+            h_img, w_img = img_bgr.shape[:2]
 
         # Prepare output directories
         objects_dir = os.path.join(output_dir, "objects")

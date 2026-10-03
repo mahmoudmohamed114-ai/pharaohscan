@@ -480,7 +480,7 @@ def validate_box(box: list) -> bool:
 def get_class_id(class_name: str) -> int:
     with open(CLASS_MAPPING_FILE, 'r') as f:
         mapping = json.load(f)
-    if class_name in mapping:
+    if class_name in mapping:   
         return mapping[class_name]
     existing_ids = mapping.values()
     new_id = max(existing_ids) + 1 if existing_ids else 3
@@ -895,6 +895,11 @@ def api_segment_artifacts():
         return jsonify({'error': 'Invalid image format'}), 400
 
     try:
+        try:
+            import eventlet
+            eventlet.sleep(0)
+        except Exception:
+            pass
         pipeline = get_artifact_pipeline()
         output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "outputs"))
         res = pipeline.process_image(img, output_dir=output_dir)
@@ -2372,6 +2377,9 @@ def _warmup_models():
             print("[WARMUP] Pre-loading YOLO11 model...")
             get_yolo_y11()
             print("[WARMUP] YOLO11 ready.")
+            print("[WARMUP] Pre-loading Artifact Segmentation Pipeline...")
+            get_artifact_pipeline()
+            print("[WARMUP] Artifact Segmentation Pipeline ready.")
             print("[WARMUP] All models pre-loaded successfully.")
         except Exception as e:
             print(f"[WARMUP] Model pre-load failed (non-fatal): {e}")
