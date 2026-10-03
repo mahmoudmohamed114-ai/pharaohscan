@@ -1467,44 +1467,104 @@
                     </div>
                 </div>
 
-                <!-- ── Locked Sensor Pose Anchor Card (Captured at Photo Snap) ── -->
-                <div id="captured-sensor-card" style="display: none; margin-top: 14px; background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.4); border-radius: 12px; padding: 12px 16px;">
-                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
-                        <span style="font-size: 0.82rem; font-weight: 700; color: #10b981; display: flex; align-items: center; gap: 6px;">
+                <!-- ── Locked Sensor Pose Anchor Card (Shown ONLY on Photo Capture) ── -->
+                <div id="captured-sensor-card" style="display: none; margin-top: 16px; background: rgba(15, 23, 42, 0.75); border: 1px solid rgba(168, 85, 247, 0.4); border-radius: 14px; padding: 18px 20px; box-shadow: 0 8px 32px rgba(0,0,0,0.37); backdrop-filter: blur(10px);">
+                    <!-- Main Card Header -->
+                    <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; border-bottom: 1px solid rgba(255,255,255,0.08); padding-bottom: 10px;">
+                        <span style="font-size: 0.92rem; font-weight: 800; color: #10b981; display: flex; align-items: center; gap: 8px;">
                             🔒 Photo Capture Sensor Anchor (Locked)
                         </span>
-                        <span id="captured-sensor-time" style="font-size: 0.72rem; color: var(--text-muted);"></span>
+                        <span id="captured-sensor-time" style="font-size: 0.76rem; color: #94a3b8; font-weight: 600; background: rgba(255,255,255,0.06); padding: 3px 8px; border-radius: 8px;"></span>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 0.75rem; text-align: center; margin-bottom: 6px;">
-                        <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
-                            <div style="color: var(--text-muted); font-size: 0.68rem;">GYRO α (Yaw)</div>
-                            <div id="cap-gyro-alpha" style="font-weight: 700; color: #6ee7b7; font-size: 0.9rem;">0.0°</div>
+
+                    <!-- ── Gyroscope / Orientation Sensor Section ── -->
+                    <div style="margin-bottom: 18px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                            <h5 style="margin: 0; font-size: 0.88rem; font-weight: 700; color: var(--primary-purple); display: flex; align-items: center; gap: 6px;">
+                                🔄 Gyroscope / Orientation Sensor
+                            </h5>
+                            <span style="font-size: 0.72rem; color: #10b981; font-weight: 600;">✅ Captured at Snap</span>
                         </div>
-                        <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
-                            <div style="color: var(--text-muted); font-size: 0.68rem;">GYRO β (Pitch)</div>
-                            <div id="cap-gyro-beta" style="font-weight: 700; color: #6ee7b7; font-size: 0.9rem;">0.0°</div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                            <div class="gyro-cell" style="background: rgba(168, 85, 247, 0.1); border-radius: 10px; padding: 10px 8px; text-align: center;">
+                                <div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px;">ALPHA (Z)</div>
+                                <div id="cap-gyro-alpha" style="font-size: 1.15rem; font-weight: 800; color: #fff;">0.0°</div>
+                                <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 2px;">° yaw</div>
+                            </div>
+                            <div class="gyro-cell" style="background: rgba(168, 85, 247, 0.1); border-radius: 10px; padding: 10px 8px; text-align: center;">
+                                <div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px;">BETA (X)</div>
+                                <div id="cap-gyro-beta" style="font-size: 1.15rem; font-weight: 800; color: #fff;">0.0°</div>
+                                <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 2px;">° tilt fwd</div>
+                            </div>
+                            <div class="gyro-cell" style="background: rgba(168, 85, 247, 0.1); border-radius: 10px; padding: 10px 8px; text-align: center;">
+                                <div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px;">GAMMA (Y)</div>
+                                <div id="cap-gyro-gamma" style="font-size: 1.15rem; font-weight: 800; color: #fff;">0.0°</div>
+                                <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 2px;">° tilt side</div>
+                            </div>
                         </div>
-                        <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
-                            <div style="color: var(--text-muted); font-size: 0.68rem;">GYRO γ (Roll)</div>
-                            <div id="cap-gyro-gamma" style="font-weight: 700; color: #6ee7b7; font-size: 0.9rem;">0.0°</div>
+                        <!-- Gyroscope visual progress bars -->
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div class="gyro-bar-row">
+                                <span class="gyro-bar-label">α</span>
+                                <div class="gyro-bar-track"><div class="gyro-bar-fill" id="cap-bar-alpha" style="width:50%"></div></div>
+                            </div>
+                            <div class="gyro-bar-row">
+                                <span class="gyro-bar-label">β</span>
+                                <div class="gyro-bar-track"><div class="gyro-bar-fill" id="cap-bar-beta" style="width:50%"></div></div>
+                            </div>
+                            <div class="gyro-bar-row">
+                                <span class="gyro-bar-label">γ</span>
+                                <div class="gyro-bar-track"><div class="gyro-bar-fill" id="cap-bar-gamma" style="width:50%"></div></div>
+                            </div>
                         </div>
                     </div>
-                    <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; font-size: 0.75rem; text-align: center;">
-                        <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
-                            <div style="color: var(--text-muted); font-size: 0.68rem;">ACCEL X</div>
-                            <div id="cap-accel-x" style="font-weight: 700; color: #93c5fd; font-size: 0.85rem;">0.00</div>
+
+                    <!-- ── Accelerometer / Device Motion Section ── -->
+                    <div style="margin-bottom: 12px; border-top: 1px solid rgba(255,255,255,0.08); padding-top: 14px;">
+                        <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px;">
+                            <h5 style="margin: 0; font-size: 0.88rem; font-weight: 700; color: #60a5fa; display: flex; align-items: center; gap: 6px;">
+                                📳 Accelerometer / Device Motion
+                            </h5>
+                            <span style="font-size: 0.72rem; color: #60a5fa; font-weight: 600;">✅ Captured at Snap</span>
                         </div>
-                        <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
-                            <div style="color: var(--text-muted); font-size: 0.68rem;">ACCEL Y</div>
-                            <div id="cap-accel-y" style="font-weight: 700; color: #93c5fd; font-size: 0.85rem;">0.00</div>
+                        <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; margin-bottom: 10px;">
+                            <div class="accel-cell" style="background: rgba(59, 130, 246, 0.1); border-radius: 10px; padding: 10px 8px; text-align: center;">
+                                <div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px;">X (Left/Right)</div>
+                                <div id="cap-accel-x" style="font-size: 1.15rem; font-weight: 800; color: #fff;">0.00</div>
+                                <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 2px;">m/s²</div>
+                            </div>
+                            <div class="accel-cell" style="background: rgba(59, 130, 246, 0.1); border-radius: 10px; padding: 10px 8px; text-align: center;">
+                                <div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px;">Y (Up/Down)</div>
+                                <div id="cap-accel-y" style="font-size: 1.15rem; font-weight: 800; color: #fff;">0.00</div>
+                                <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 2px;">m/s²</div>
+                            </div>
+                            <div class="accel-cell" style="background: rgba(59, 130, 246, 0.1); border-radius: 10px; padding: 10px 8px; text-align: center;">
+                                <div style="font-size: 0.68rem; color: var(--text-muted); font-weight: 700; letter-spacing: 0.05em; margin-bottom: 4px;">Z (Front/Back)</div>
+                                <div id="cap-accel-z" style="font-size: 1.15rem; font-weight: 800; color: #fff;">0.00</div>
+                                <div style="font-size: 0.68rem; color: var(--text-muted); margin-top: 2px;">m/s²</div>
+                            </div>
                         </div>
-                        <div style="background: rgba(255,255,255,0.05); padding: 6px; border-radius: 8px;">
-                            <div style="color: var(--text-muted); font-size: 0.68rem;">ACCEL Z</div>
-                            <div id="cap-accel-z" style="font-weight: 700; color: #93c5fd; font-size: 0.85rem;">0.00</div>
+                        <!-- Accelerometer visual progress bars -->
+                        <div style="display: flex; flex-direction: column; gap: 6px;">
+                            <div class="accel-bar-row">
+                                <span class="accel-bar-label">X</span>
+                                <div class="accel-bar-track"><div class="accel-bar-fill" id="cap-abar-x" style="width:50%"></div></div>
+                            </div>
+                            <div class="accel-bar-row">
+                                <span class="accel-bar-label">Y</span>
+                                <div class="accel-bar-track"><div class="accel-bar-fill" id="cap-abar-y" style="width:50%"></div></div>
+                            </div>
+                            <div class="accel-bar-row">
+                                <span class="accel-bar-label">Z</span>
+                                <div class="accel-bar-track"><div class="accel-bar-fill" id="cap-abar-z" style="width:50%"></div></div>
+                            </div>
                         </div>
                     </div>
-                    <div style="font-size: 0.68rem; color: rgba(255,255,255,0.5); margin-top: 6px; text-align: center;">
-                        ⚓ Sensor aspects frozen at capture time &amp; retained across photo changes
+
+                    <!-- Footer note -->
+                    <div style="font-size: 0.72rem; color: #94a3b8; text-align: center; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 10px; display: flex; align-items: center; justify-content: center; gap: 6px;">
+                        <span>⚓</span>
+                        <span>Sensor aspects frozen at capture time &amp; retained across photo changes</span>
                     </div>
                 </div>
 
@@ -1598,100 +1658,6 @@
 
                 </div>
 
-            </div>
-
-
-
-            <!-- ── Gyroscope Sensor Test Panel (Mobile Only) ── -->
-            <div id="gyro-panel">
-                <h4>🔄 Gyroscope / Orientation Sensor</h4>
-                <div class="gyro-status" id="gyro-status">Checking sensor support…</div>
-
-                <!-- Permission button — shown only on iOS Safari -->
-                <button class="btn-gyro-req" id="btn-gyro-req" style="display:none; margin-bottom:14px;">
-                    🔓 Grant Gyroscope Permission
-                </button>
-
-                <!-- Live value grid -->
-                <div class="gyro-grid" id="gyro-grid">
-                    <div class="gyro-cell">
-                        <div class="gyro-label">ALPHA (Z)</div>
-                        <div class="gyro-val" id="g-alpha">–</div>
-                        <div class="gyro-unit">° yaw</div>
-                    </div>
-                    <div class="gyro-cell">
-                        <div class="gyro-label">BETA (X)</div>
-                        <div class="gyro-val" id="g-beta">–</div>
-                        <div class="gyro-unit">° tilt fwd</div>
-                    </div>
-                    <div class="gyro-cell">
-                        <div class="gyro-label">GAMMA (Y)</div>
-                        <div class="gyro-val" id="g-gamma">–</div>
-                        <div class="gyro-unit">° tilt side</div>
-                    </div>
-                </div>
-
-                <!-- Visual bars -->
-                <div id="gyro-bars">
-                    <div class="gyro-bar-row">
-                        <span class="gyro-bar-label">α</span>
-                        <div class="gyro-bar-track"><div class="gyro-bar-fill" id="bar-alpha" style="width:50%"></div></div>
-                    </div>
-                    <div class="gyro-bar-row">
-                        <span class="gyro-bar-label">β</span>
-                        <div class="gyro-bar-track"><div class="gyro-bar-fill" id="bar-beta" style="width:50%"></div></div>
-                    </div>
-                    <div class="gyro-bar-row">
-                        <span class="gyro-bar-label">γ</span>
-                        <div class="gyro-bar-track"><div class="gyro-bar-fill" id="bar-gamma" style="width:50%"></div></div>
-                    </div>
-                </div>
-            </div>
-
-            <!-- ── Accelerometer Sensor Test Panel (Mobile Only) ── -->
-            <div id="accel-panel">
-                <h4>📳 Accelerometer / Device Motion</h4>
-                <div class="accel-status" id="accel-status">Checking sensor support…</div>
-
-                <!-- Permission button — iOS Safari only -->
-                <button class="btn-accel-req" id="btn-accel-req" style="display:none;">
-                    🔓 Grant Motion Permission
-                </button>
-
-                <!-- Live value grid: acceleration WITHOUT gravity -->
-                <div class="accel-grid">
-                    <div class="accel-cell">
-                        <div class="accel-label">X (Left/Right)</div>
-                        <div class="accel-val" id="a-x">–</div>
-                        <div class="accel-unit">m/s²</div>
-                    </div>
-                    <div class="accel-cell">
-                        <div class="accel-label">Y (Up/Down)</div>
-                        <div class="accel-val" id="a-y">–</div>
-                        <div class="accel-unit">m/s²</div>
-                    </div>
-                    <div class="accel-cell">
-                        <div class="accel-label">Z (Front/Back)</div>
-                        <div class="accel-val" id="a-z">–</div>
-                        <div class="accel-unit">m/s²</div>
-                    </div>
-                </div>
-
-                <!-- Visual bars -->
-                <div>
-                    <div class="accel-bar-row">
-                        <span class="accel-bar-label">X</span>
-                        <div class="accel-bar-track"><div class="accel-bar-fill" id="abar-x" style="width:50%"></div></div>
-                    </div>
-                    <div class="accel-bar-row">
-                        <span class="accel-bar-label">Y</span>
-                        <div class="accel-bar-track"><div class="accel-bar-fill" id="abar-y" style="width:50%"></div></div>
-                    </div>
-                    <div class="accel-bar-row">
-                        <span class="accel-bar-label">Z</span>
-                        <div class="accel-bar-track"><div class="accel-bar-fill" id="abar-z" style="width:50%"></div></div>
-                    </div>
-                </div>
             </div>
 
         </div>
@@ -2148,6 +2114,8 @@
             if (!card || !window.capturedPhotoSensors) return;
             const s = window.capturedPhotoSensors;
             const fmt = (v, d = 1) => (v !== null && v !== undefined) ? Number(v).toFixed(d) : '0.0';
+            const pct = (val, range) => Math.min(100, Math.max(0, ((Number(val) + range) / (2 * range)) * 100));
+
             const elA = document.getElementById('cap-gyro-alpha');
             const elB = document.getElementById('cap-gyro-beta');
             const elG = document.getElementById('cap-gyro-gamma');
@@ -2163,6 +2131,22 @@
             if (elY) elY.textContent = fmt(s.y, 2);
             if (elZ) elZ.textContent = fmt(s.z, 2);
             if (elT) elT.textContent = 'Captured: ' + (s.timestamp || '');
+
+            // Visual Progress Bars
+            const bA = document.getElementById('cap-bar-alpha');
+            const bB = document.getElementById('cap-bar-beta');
+            const bG = document.getElementById('cap-bar-gamma');
+            const abX = document.getElementById('cap-abar-x');
+            const abY = document.getElementById('cap-abar-y');
+            const abZ = document.getElementById('cap-abar-z');
+
+            if (bA && s.alpha !== null) bA.style.width = (s.alpha / 360 * 100).toFixed(1) + '%';
+            if (bB && s.beta !== null)  bB.style.width = pct(s.beta, 90).toFixed(1) + '%';
+            if (bG && s.gamma !== null) bG.style.width = pct(s.gamma, 90).toFixed(1) + '%';
+            if (abX && s.x !== null)    abX.style.width = pct(s.x, 20).toFixed(1) + '%';
+            if (abY && s.y !== null)    abY.style.width = pct(s.y, 20).toFixed(1) + '%';
+            if (abZ && s.z !== null)    abZ.style.width = pct(s.z, 20).toFixed(1) + '%';
+
             card.style.display = 'block';
         }
 
@@ -2214,6 +2198,14 @@
         let _cameraStream = null;
 
         async function openCamera() {
+            // Request iOS 13+ sensor permissions on camera tap user gesture
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission().catch(() => {});
+            }
+            if (typeof DeviceMotionEvent !== 'undefined' && typeof DeviceMotionEvent.requestPermission === 'function') {
+                DeviceMotionEvent.requestPermission().catch(() => {});
+            }
+
             const overlay = document.getElementById('camera-overlay');
             const video = document.getElementById('camera-video');
             try {
@@ -2645,6 +2637,7 @@
         (function initGyroPanel() {
 
             const panel      = document.getElementById('gyro-panel');
+            if (!panel) return;
             const statusEl   = document.getElementById('gyro-status');
             const reqBtn     = document.getElementById('btn-gyro-req');
             const elAlpha    = document.getElementById('g-alpha');
@@ -2778,6 +2771,7 @@
         (function initAccelPanel() {
 
             const panel    = document.getElementById('accel-panel');
+            if (!panel) return;
             const statusEl = document.getElementById('accel-status');
             const reqBtn   = document.getElementById('btn-accel-req');
             const elX      = document.getElementById('a-x');
