@@ -1113,11 +1113,11 @@ def generate_visual_segmentation(img, box_coords, label="Landmark", conf_str="95
                 
             full_mask[y1:y2, x1:x2] = roi_mask
 
-    # Translucent colored overlay
+    # Translucent colored overlay (Vivid 45% alpha)
     annotated = img.copy()
     overlay = annotated.copy()
     overlay[full_mask > 0] = color
-    cv2.addWeighted(overlay, 0.38, annotated, 0.62, 0, annotated)
+    cv2.addWeighted(overlay, 0.45, annotated, 0.55, 0, annotated)
     
     # Glowing perimeter contour
     cnts, _ = cv2.findContours(full_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -1128,8 +1128,8 @@ def generate_visual_segmentation(img, box_coords, label="Landmark", conf_str="95
         approx = cv2.approxPolyDP(largest_cnt, epsilon, True)
         normalized_poly = [[round(pt[0][0] / w_img, 4), round(pt[0][1] / h_img, 4)] for pt in approx]
 
-        # Multi-layer glow
-        cv2.drawContours(annotated, cnts, -1, color, 4, cv2.LINE_AA)
+        # Multi-layer neon glow
+        cv2.drawContours(annotated, cnts, -1, color, 5, cv2.LINE_AA)
         bright_color = tuple(min(255, int(c) + 90) for c in color)
         cv2.drawContours(annotated, cnts, -1, bright_color, 2, cv2.LINE_AA)
         cv2.drawContours(annotated, cnts, -1, (255, 255, 255), 1, cv2.LINE_AA)
@@ -1148,8 +1148,8 @@ def generate_visual_segmentation(img, box_coords, label="Landmark", conf_str="95
     cv2.line(annotated, (x2, y2), (x2 - corner_len, y2), bracket_color, bracket_thickness, cv2.LINE_AA)
     cv2.line(annotated, (x2, y2), (x2, y2 - corner_len), bracket_color, bracket_thickness, cv2.LINE_AA)
 
-    # Label Pill with class and confidence
-    label_text = f"{label} {conf_str}"
+    # Futuristic Label Pill with class, confidence and segmentation tag
+    label_text = f"✨ {label} {conf_str} [MASK]"
     font = cv2.FONT_HERSHEY_DUPLEX
     font_scale = 0.60
     font_thick = 1
@@ -1166,7 +1166,7 @@ def generate_visual_segmentation(img, box_coords, label="Landmark", conf_str="95
     
     pill_overlay = annotated.copy()
     cv2.rectangle(pill_overlay, (px1, py1), (px2, py2), (15, 23, 42), -1)
-    cv2.addWeighted(pill_overlay, 0.88, annotated, 0.12, 0, annotated)
+    cv2.addWeighted(pill_overlay, 0.90, annotated, 0.10, 0, annotated)
     
     cv2.rectangle(annotated, (px1, py1), (px2, py2), color, 1, cv2.LINE_AA)
     dot_center = (px1 + 10, py1 + pill_h // 2)
