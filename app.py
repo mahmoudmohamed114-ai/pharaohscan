@@ -20,7 +20,7 @@ import numpy as np
 from PIL import Image
 import io
 
-from flask import Flask, request, jsonify, render_template, send_from_directory
+from flask import Flask, request, jsonify, render_template, send_from_directory, send_file
 from flask_cors import CORS
 from flask_socketio import SocketIO, emit
 from bson import ObjectId, json_util
@@ -849,6 +849,85 @@ def api_detect_result(job_id):
     if job["status"] == "error":
         return jsonify(job["result"]), 500
     return jsonify(job["result"])
+
+# ─── Artifacts Instance Segmentation Pipeline ──────────────────────────────────
+_artifact_pipeline = None
+
+def get_artifact_pipeline():
+    global _artifact_pipeline
+    if _artifact_pipeline is None:
+        from artifact_segmentation_pipeline import ArtifactSegmentationPipeline
+        _artifact_pipeline = ArtifactSegmentationPipeline()
+    return _artifact_pipeline
+
+@app.route('/outputs/<path:filename>')
+def serve_output_file(filename):
+    """Serve generated pipeline artifacts (detection.jpg, segmentation.jpg, objects/*.png, results.json)."""
+    outputs_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "outputs"))
+    return send_from_directory(outputs_dir, filename)
+
+@app.route('/api/artifacts/sample', methods=['GET'])
+def api_sample_artifact():
+    """Serve sample museum artifacts showcase image for quick testing."""
+    sample_path = os.path.join(os.path.dirname(__file__), "test_museum_jewelry.jpg")
+    if os.path.exists(sample_path):
+        return send_file(sample_path, mimetype='image/jpeg')
+    return jsonify({'error': 'Sample image not found'}), 404
+
+@app.route('/api/artifacts/segment', methods=['POST'])
+@app.route('/api/segment-artifacts', methods=['POST'])
+def api_segment_artifacts():
+    """
+    Instance-segmentation-based recognition pipeline for multiple museum artifacts/jewelry:
+    Detect -> Segment -> Extract RGBA Crops -> Classify -> Return Visuals & results.json
+    """
+    if 'image' not in request.files:
+        return jsonify({'error': 'No image uploaded'}), 400
+
+    file = request.files['image']
+    if not file.filename:
+        return jsonify({'error': 'Empty filename'}), 400
+
+    file_bytes = file.read()
+    nparr = np.frombuffer(file_bytes, np.uint8)
+    img = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
+    if img is None:
+        return jsonify({'error': 'Invalid image format'}), 400
+
+    try:
+        pipeline = get_artifact_pipeline()
+        output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "outputs"))
+        res = pipeline.process_image(img, output_dir=output_dir)
+
+        # Base64 encodings for immediate client rendering
+        with open(res["detection_path"], "rb") as f:
+            det_b64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode('utf-8')
+
+        with open(res["segmentation_path"], "rb") as f:
+            seg_b64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode('utf-8')
+
+        items_enhanced = []
+        for item in res["results"]["items"]:
+            obj_path = os.path.join(output_dir, item["segmented_image"])
+            item_data = dict(item)
+            item_data["url"] = f"/outputs/{item['segmented_image']}"
+            if os.path.exists(obj_path):
+                with open(obj_path, "rb") as of:
+                    item_data["image_base64"] = "data:image/png;base64," + base64.b64encode(of.read()).decode('utf-8')
+            items_enhanced.append(item_data)
+
+        return jsonify({
+            'success': True,
+            'detection_image': det_b64,
+            'segmentation_image': seg_b64,
+            'items': items_enhanced,
+            'results_json': res["results"],
+            'num_items': len(items_enhanced)
+        })
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({'error': str(e)}), 500
 
 @app.route('/api/objects', methods=['GET'])
 def api_objects():

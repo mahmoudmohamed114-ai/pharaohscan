@@ -1317,6 +1317,286 @@
                 grid-column: 1;
             }
         }
+
+        /* ════════════════════════════════════════════════════════════════
+           Pipeline Mode Navigation Bar & Museum Artifact Styles
+           ════════════════════════════════════════════════════════════════ */
+        .pipeline-mode-nav-wrap {
+            max-width: 1500px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 12px 40px 0 40px;
+        }
+
+        .pipeline-mode-nav {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 14px;
+            padding: 6px;
+            backdrop-filter: blur(12px);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
+        }
+
+        .mode-tab-btn {
+            flex: 1;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            padding: 12px 20px;
+            border-radius: 10px;
+            border: 1px solid transparent;
+            background: transparent;
+            color: #94a3b8;
+            font-family: 'Inter', sans-serif;
+            font-size: 0.95rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.25s ease;
+        }
+
+        .mode-tab-btn:hover {
+            color: #fff;
+            background: rgba(255, 255, 255, 0.04);
+        }
+
+        .mode-tab-btn.active {
+            background: linear-gradient(135deg, rgba(16, 185, 129, 0.18) 0%, rgba(6, 182, 212, 0.14) 100%);
+            border-color: rgba(16, 185, 129, 0.4);
+            color: #fff;
+            box-shadow: 0 4px 16px rgba(16, 185, 129, 0.15);
+        }
+
+        .mode-tab-btn .tab-pill {
+            background: linear-gradient(135deg, #10b981, #06b6d4);
+            color: #fff;
+            font-size: 0.65rem;
+            font-weight: 800;
+            padding: 2px 7px;
+            border-radius: 10px;
+            letter-spacing: 0.5px;
+            text-transform: uppercase;
+        }
+
+        .container-artifact-pipeline {
+            max-width: 1500px;
+            width: 100%;
+            margin: 0 auto;
+            padding: 24px 40px;
+            display: flex;
+            flex-direction: column;
+            gap: 24px;
+        }
+
+        .artifact-stepper-wrap {
+            background: rgba(15, 23, 42, 0.6);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 14px;
+            padding: 14px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            overflow-x: auto;
+            gap: 8px;
+        }
+
+        .step-node {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            white-space: nowrap;
+            font-size: 0.82rem;
+            font-weight: 600;
+            color: #94a3b8;
+        }
+
+        .step-node.active-step {
+            color: #34d399;
+        }
+
+        .step-icon-badge {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.05);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.85rem;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .step-node.active-step .step-icon-badge {
+            background: rgba(16, 185, 129, 0.2);
+            border-color: #10b981;
+            color: #34d399;
+        }
+
+        .step-arrow {
+            color: rgba(255, 255, 255, 0.2);
+            font-size: 0.8rem;
+        }
+
+        .artifact-studio-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 24px;
+        }
+
+        @media (max-width: 1024px) {
+            .artifact-studio-grid {
+                grid-template-columns: 1fr;
+            }
+            .pipeline-mode-nav-wrap, .container-artifact-pipeline {
+                padding: 16px;
+            }
+        }
+
+        /* Transparent Checkerboard Pattern for RGBA Crops */
+        .transparent-checkerboard {
+            background-color: #0b0f19;
+            background-image: 
+                linear-gradient(45deg, #182234 25%, transparent 25%), 
+                linear-gradient(-45deg, #182234 25%, transparent 25%), 
+                linear-gradient(45deg, transparent 75%, #182234 75%), 
+                linear-gradient(-45deg, transparent 75%, #182234 75%);
+            background-size: 16px 16px;
+            background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+        }
+
+        .extracted-gallery-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+            gap: 20px;
+            margin-top: 16px;
+        }
+
+        .extracted-item-card {
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 14px;
+            padding: 16px;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+
+        .extracted-item-card:hover {
+            transform: translateY(-3px);
+            border-color: rgba(16, 185, 129, 0.45);
+            box-shadow: 0 12px 30px rgba(16, 185, 129, 0.12);
+        }
+
+        .extracted-image-box {
+            width: 100%;
+            height: 220px;
+            border-radius: 10px;
+            overflow: hidden;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            margin-bottom: 14px;
+            position: relative;
+        }
+
+        .extracted-image-box img {
+            max-width: 90%;
+            max-height: 90%;
+            object-fit: contain;
+            filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.5));
+            transition: transform 0.2s ease;
+        }
+
+        .extracted-image-box img:hover {
+            transform: scale(1.04);
+        }
+
+        .extracted-meta-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 6px;
+        }
+
+        .item-id-pill {
+            font-size: 0.75rem;
+            font-weight: 800;
+            background: rgba(168, 85, 247, 0.18);
+            border: 1px solid rgba(168, 85, 247, 0.4);
+            color: #d8b4fe;
+            padding: 3px 10px;
+            border-radius: 20px;
+            letter-spacing: 0.5px;
+        }
+
+        .item-class-title {
+            font-size: 1.15rem;
+            font-weight: 700;
+            color: #fff;
+            margin: 4px 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        .item-conf-badge {
+            font-size: 0.82rem;
+            font-weight: 700;
+            color: #34d399;
+        }
+
+        .item-bbox-txt {
+            font-size: 0.75rem;
+            color: #94a3b8;
+            font-family: monospace;
+            background: rgba(0, 0, 0, 0.3);
+            padding: 4px 8px;
+            border-radius: 6px;
+            margin-top: 6px;
+            display: inline-block;
+        }
+
+        .btn-download-crop {
+            margin-top: 12px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.05);
+            border: 1px solid rgba(255, 255, 255, 0.12);
+            color: #e2e8f0;
+            font-size: 0.8rem;
+            font-weight: 600;
+            padding: 7px 12px;
+            border-radius: 8px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.2s ease;
+        }
+
+        .btn-download-crop:hover {
+            background: rgba(16, 185, 129, 0.15);
+            border-color: rgba(16, 185, 129, 0.35);
+            color: #34d399;
+        }
+
+        .json-viewer-pre {
+            background: #090d16;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 10px;
+            padding: 16px;
+            color: #38bdf8;
+            font-family: 'Consolas', 'Monaco', monospace;
+            font-size: 0.82rem;
+            max-height: 320px;
+            overflow: auto;
+            white-space: pre-wrap;
+            word-break: break-all;
+            line-height: 1.5;
+        }
     </style>
 </head>
 
@@ -1336,8 +1616,25 @@
         </div>
     </header>
 
-    <!-- Main Container -->
-    <div class="container">
+    <!-- ════════════════════════════════════════════════════════════════
+         Pipeline Mode Switcher: Heritage Explorer vs Artifact Segmentation
+         ════════════════════════════════════════════════════════════════ -->
+    <div class="pipeline-mode-nav-wrap">
+        <div class="pipeline-mode-nav">
+            <button class="mode-tab-btn active" id="tab-mode-landmark" type="button">
+                <span class="tab-icon">🏛️</span>
+                <span class="tab-label">Heritage Explorer &amp; Landmarks</span>
+            </button>
+            <button class="mode-tab-btn" id="tab-mode-artifacts" type="button">
+                <span class="tab-icon">💎</span>
+                <span class="tab-label">Museum Artifact Instance Segmentation</span>
+                <span class="tab-pill">NEW</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Main Container: Landmark Explorer -->
+    <div class="container" id="landmark-container">
 
         <!-- ── Left Column: Your Location & Live Object Tracker ── -->
         <div class="column-left">
@@ -1688,6 +1985,252 @@
 
                 </div>
 
+            </div>
+
+        </div>
+
+    </div>
+
+    <!-- ════════════════════════════════════════════════════════════════
+         Museum Artifact Instance Segmentation Studio
+         ════════════════════════════════════════════════════════════════ -->
+    <div class="container-artifact-pipeline" id="artifact-segmentation-container" style="display: none;">
+
+        <!-- Pipeline Workflow Stepper Banner -->
+        <div class="artifact-stepper-wrap">
+            <div class="step-node active-step">
+                <div class="step-icon-badge">1</div>
+                <span>Multi-Item Image</span>
+            </div>
+            <span class="step-arrow">➔</span>
+            <div class="step-node active-step">
+                <div class="step-icon-badge">2</div>
+                <span>Object Detection</span>
+            </div>
+            <span class="step-arrow">➔</span>
+            <div class="step-node active-step">
+                <div class="step-icon-badge">3</div>
+                <span>Instance Segmentation</span>
+            </div>
+            <span class="step-arrow">➔</span>
+            <div class="step-node active-step">
+                <div class="step-icon-badge">4</div>
+                <span>Extract Isolated Objects</span>
+            </div>
+            <span class="step-arrow">➔</span>
+            <div class="step-node active-step">
+                <div class="step-icon-badge">5</div>
+                <span>Remove Background (RGBA)</span>
+            </div>
+            <span class="step-arrow">➔</span>
+            <div class="step-node active-step">
+                <div class="step-icon-badge">6</div>
+                <span>Tight Crop</span>
+            </div>
+            <span class="step-arrow">➔</span>
+            <div class="step-node active-step">
+                <div class="step-icon-badge">7</div>
+                <span>Artifact Classification</span>
+            </div>
+            <span class="step-arrow">➔</span>
+            <div class="step-node active-step">
+                <div class="step-icon-badge">8</div>
+                <span>Export &amp; results.json</span>
+            </div>
+        </div>
+
+        <!-- Top Input & Controls Grid -->
+        <div class="artifact-studio-grid">
+            
+            <!-- Upload & Execution Card -->
+            <div class="card" style="margin-bottom: 0;">
+                <div class="card-header">
+                    <h2>💎 Upload Museum Artifacts / Jewelry</h2>
+                </div>
+                
+                <p style="font-size: 0.88rem; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5;">
+                    Upload an image containing multiple museum items (jewelry, necklaces, bracelets, rings, pendants, beads, or other archaeological artifacts). The pipeline detects each item, generates an individual instance mask, removes the background with transparent alpha, crops tightly, and predicts artifact classes.
+                </p>
+
+                <div class="upload-area" id="artifact-drop-zone" style="margin-bottom: 16px; padding: 26px 20px;">
+                    <div class="upload-icon">🏺</div>
+                    <p style="font-weight: 700; font-size: 1.05rem; margin-bottom: 4px; color: #fff;">Choose Artifact Image</p>
+                    <p style="font-size: 0.85rem; color: var(--text-muted);">Click to browse or drag and drop museum jewelry photo</p>
+                    <input type="file" id="artifact-file-input" accept="image/*" style="display: none;">
+                </div>
+
+                <!-- Action Button Row -->
+                <div style="display: flex; gap: 10px; margin-bottom: 12px; flex-wrap: wrap;">
+                    <button id="btn-load-sample-jewelry" type="button" 
+                        style="flex: 1; min-width: 180px; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-weight: 700; font-size: 0.86rem; padding: 12px 16px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; transition: all 0.2s;">
+                        <span>✨ Load Showcase Sample</span>
+                    </button>
+                    <button id="btn-run-artifact-pipeline" type="button" disabled
+                        style="flex: 1.5; min-width: 220px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: #fff; font-weight: 700; font-size: 0.92rem; padding: 12px 18px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 8px; box-shadow: 0 4px 15px rgba(16, 185, 129, 0.3); transition: all 0.2s;">
+                        <span>⚡ Run Segmentation Pipeline</span>
+                    </button>
+                </div>
+
+                <!-- Input Image Preview Box -->
+                <div id="artifact-input-preview-box" style="display: none; margin-top: 14px; position: relative; border-radius: 12px; overflow: hidden; border: 1px solid rgba(255,255,255,0.1); background: #000; text-align: center;">
+                    <img id="artifact-input-img" src="" alt="Artifact Input Preview" style="max-height: 280px; width: auto; max-width: 100%; object-fit: contain;">
+                    <div style="position: absolute; bottom: 8px; right: 10px; background: rgba(0,0,0,0.7); backdrop-filter: blur(4px); padding: 4px 10px; border-radius: 6px; font-size: 0.72rem; color: #cbd5e1;" id="artifact-input-specs">
+                        Ready to process
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- Pipeline Specifications & Architecture Card -->
+            <div class="card" style="margin-bottom: 0;">
+                <div class="card-header">
+                    <h2>⚙️ Pipeline Architecture &amp; Constraints</h2>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 12px; font-size: 0.86rem; color: #cbd5e1;">
+                    <div style="background: rgba(16, 185, 129, 0.08); border: 1px solid rgba(16, 185, 129, 0.25); border-radius: 10px; padding: 12px 14px;">
+                        <strong style="color: #34d399; display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                            <span>🎯 Instance vs Semantic Segmentation</span>
+                        </strong>
+                        <p style="margin: 0; color: #94a3b8; font-size: 0.82rem; line-height: 1.45;">
+                            Every physical artifact receives its own distinct mask. Clustered or adjacent jewelry items remain separated with unique IDs (Item_01, Item_02...).
+                        </p>
+                    </div>
+
+                    <div style="background: rgba(6, 182, 212, 0.08); border: 1px solid rgba(6, 182, 212, 0.25); border-radius: 10px; padding: 12px 14px;">
+                        <strong style="color: #38bdf8; display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                            <span>✂️ Detail &amp; Hole Preservation</span>
+                        </strong>
+                        <p style="margin: 0; color: #94a3b8; font-size: 0.82rem; line-height: 1.45;">
+                            Multi-level bilateral edge refinement preserves thin necklace chains, bead links, and ring apertures with transparent center holes (alpha = 0).
+                        </p>
+                    </div>
+
+                    <div style="background: rgba(168, 85, 247, 0.08); border: 1px solid rgba(168, 85, 247, 0.25); border-radius: 10px; padding: 12px 14px;">
+                        <strong style="color: #c084fc; display: flex; align-items: center; gap: 6px; margin-bottom: 4px;">
+                            <span>💾 Standard Output Directory &amp; JSON</span>
+                        </strong>
+                        <p style="margin: 0; color: #94a3b8; font-size: 0.82rem; line-height: 1.45;">
+                            Outputs are saved to <span style="color:#fff; font-family:monospace;">outputs/detection.jpg</span>, <span style="color:#fff; font-family:monospace;">outputs/segmentation.jpg</span>, <span style="color:#fff; font-family:monospace;">outputs/objects/Item_XX.png</span>, and <span style="color:#fff; font-family:monospace;">outputs/results.json</span>.
+                        </p>
+                    </div>
+
+                    <!-- Processing Status Banner -->
+                    <div id="artifact-processing-status" style="display: none; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 10px; padding: 12px 16px; align-items: center; gap: 12px;">
+                        <div class="pulse-dot" style="background: #818cf8; box-shadow: 0 0 10px #818cf8;"></div>
+                        <div style="flex: 1;">
+                            <div id="artifact-status-title" style="font-weight: 700; color: #e0e7ff; font-size: 0.88rem;">Running Segmentation Pipeline...</div>
+                            <div id="artifact-status-desc" style="font-size: 0.78rem; color: #a5b4fc;">Detecting objects and isolating transparent instance masks</div>
+                        </div>
+                    </div>
+
+                </div>
+
+            </div>
+
+        </div>
+
+        <!-- ════════════════════════════════════════════════════════════════
+             Results Section (OUTPUT 1, OUTPUT 2, OUTPUT 3, results.json)
+             ════════════════════════════════════════════════════════════════ -->
+        <div id="artifact-results-wrapper" style="display: none; flex-direction: column; gap: 24px;">
+
+            <!-- Summary KPI Strip -->
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 16px;">
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 18px;">
+                    <div style="font-size: 0.76rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Items Detected &amp; Isolated</div>
+                    <div id="kpi-item-count" style="font-size: 1.8rem; font-weight: 800; color: #34d399; margin-top: 2px;">0</div>
+                </div>
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 18px;">
+                    <div style="font-size: 0.76rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Average Confidence</div>
+                    <div id="kpi-avg-conf" style="font-size: 1.8rem; font-weight: 800; color: #38bdf8; margin-top: 2px;">0%</div>
+                </div>
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 18px;">
+                    <div style="font-size: 0.76rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Background Removal</div>
+                    <div style="font-size: 1.8rem; font-weight: 800; color: #c084fc; margin-top: 2px;">RGBA (Alpha 0)</div>
+                </div>
+                <div style="background: rgba(15, 23, 42, 0.7); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 18px;">
+                    <div style="font-size: 0.76rem; color: var(--text-muted); font-weight: 700; text-transform: uppercase;">Format &amp; Schema</div>
+                    <div style="font-size: 1.8rem; font-weight: 800; color: #f59e0b; margin-top: 2px;">results.json ✓</div>
+                </div>
+            </div>
+
+            <!-- Two-Column Grid: OUTPUT 1 (Detection) & OUTPUT 2 (Instance Segmentation) -->
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px;" class="artifact-studio-grid">
+                
+                <!-- OUTPUT 1: Detection -->
+                <div class="card" style="margin-bottom: 0;">
+                    <div class="card-header">
+                        <h2>📦 OUTPUT 1 — Detection</h2>
+                        <a id="btn-dl-detection" href="/outputs/detection.jpg" download="detection.jpg" target="_blank"
+                            style="font-size: 0.78rem; color: #34d399; text-decoration: none; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 4px 10px; border-radius: 6px;">
+                            ⬇️ Download detection.jpg
+                        </a>
+                    </div>
+                    <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px;">
+                        Original image with bounding boxes, Item IDs, class names, and confidence scores.
+                    </p>
+                    <div style="border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); background: #000; text-align: center;">
+                        <img id="img-output-detection" src="" alt="OUTPUT 1 Detection" style="max-height: 380px; width: auto; max-width: 100%; object-fit: contain;">
+                    </div>
+                </div>
+
+                <!-- OUTPUT 2: Instance Segmentation -->
+                <div class="card" style="margin-bottom: 0;">
+                    <div class="card-header">
+                        <h2>✨ OUTPUT 2 — Instance Segmentation</h2>
+                        <a id="btn-dl-segmentation" href="/outputs/segmentation.jpg" download="segmentation.jpg" target="_blank"
+                            style="font-size: 0.78rem; color: #38bdf8; text-decoration: none; background: rgba(6, 182, 212, 0.15); border: 1px solid rgba(6, 182, 212, 0.3); padding: 4px 10px; border-radius: 6px;">
+                            ⬇️ Download segmentation.jpg
+                        </a>
+                    </div>
+                    <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px;">
+                        Original image with distinct semi-transparent color masks and contours over every physical artifact.
+                    </p>
+                    <div style="border-radius: 10px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); background: #000; text-align: center;">
+                        <img id="img-output-segmentation" src="" alt="OUTPUT 2 Instance Segmentation" style="max-height: 380px; width: auto; max-width: 100%; object-fit: contain;">
+                    </div>
+                </div>
+
+            </div>
+
+            <!-- OUTPUT 3: Extracted Objects Gallery (Background Removed) -->
+            <div class="card" style="margin-bottom: 0;">
+                <div class="card-header">
+                    <h2>✂️ OUTPUT 3 — Extracted Objects (Background Removed)</h2>
+                    <span style="font-size: 0.8rem; color: #d8b4fe; background: rgba(168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.3); padding: 4px 12px; border-radius: 20px; font-weight: 600;">
+                        Transparent RGBA Crops
+                    </span>
+                </div>
+                <p style="font-size: 0.84rem; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5;">
+                    Every detected object is isolated into its own file with background pixels made transparent, original RGB appearance strictly preserved, and tightly cropped. Displayed below on a checkerboard backdrop to highlight transparency.
+                </p>
+
+                <!-- Extracted Object Cards Grid -->
+                <div class="extracted-gallery-grid" id="extracted-gallery-container">
+                    <!-- Populated dynamically via JS -->
+                </div>
+            </div>
+
+            <!-- results.json Registry Inspection Card -->
+            <div class="card" style="margin-bottom: 0;">
+                <div class="card-header">
+                    <h2>📄 results.json Inspection</h2>
+                    <div style="display: flex; gap: 8px;">
+                        <button id="btn-copy-json" type="button"
+                            style="font-size: 0.78rem; color: #cbd5e1; background: rgba(255,255,255,0.08); border: 1px solid rgba(255,255,255,0.15); padding: 5px 12px; border-radius: 6px; cursor: pointer;">
+                            📋 Copy JSON
+                        </button>
+                        <a id="btn-dl-results-json" href="/outputs/results.json" download="results.json" target="_blank"
+                            style="font-size: 0.78rem; color: #34d399; text-decoration: none; background: rgba(16, 185, 129, 0.15); border: 1px solid rgba(16, 185, 129, 0.3); padding: 5px 12px; border-radius: 6px; display: inline-flex; align-items: center; gap: 4px;">
+                            💾 Download results.json
+                        </a>
+                    </div>
+                </div>
+                <p style="font-size: 0.82rem; color: var(--text-muted); margin-bottom: 12px;">
+                    Standardized output file saved in <span style="color: #fff; font-family: monospace;">outputs/results.json</span>.
+                </p>
+                <pre class="json-viewer-pre" id="results-json-display">{ "status": "Waiting for pipeline run..." }</pre>
             </div>
 
         </div>
@@ -3315,6 +3858,246 @@
                 knownBox.appendChild(btn);
             }
         }
+
+        // ════════════════════════════════════════════════════════════════
+        // ── Museum Artifact Instance Segmentation Pipeline Controller ──
+        // ════════════════════════════════════════════════════════════════
+        (function initArtifactPipelineUI() {
+            // Mode switching
+            const tabLandmark = document.getElementById('tab-mode-landmark');
+            const tabArtifacts = document.getElementById('tab-mode-artifacts');
+            const containerLandmark = document.getElementById('landmark-container');
+            const containerArtifacts = document.getElementById('artifact-segmentation-container');
+
+            if (tabLandmark && tabArtifacts && containerLandmark && containerArtifacts) {
+                tabLandmark.addEventListener('click', () => {
+                    tabLandmark.classList.add('active');
+                    tabArtifacts.classList.remove('active');
+                    containerLandmark.style.display = 'grid';
+                    containerArtifacts.style.display = 'none';
+                });
+
+                tabArtifacts.addEventListener('click', () => {
+                    tabArtifacts.classList.add('active');
+                    tabLandmark.classList.remove('active');
+                    containerLandmark.style.display = 'none';
+                    containerArtifacts.style.display = 'flex';
+                });
+            }
+
+            // Elements
+            const dropZone = document.getElementById('artifact-drop-zone');
+            const fileInput = document.getElementById('artifact-file-input');
+            const btnLoadSample = document.getElementById('btn-load-sample-jewelry');
+            const btnRun = document.getElementById('btn-run-artifact-pipeline');
+            const previewBox = document.getElementById('artifact-input-preview-box');
+            const previewImg = document.getElementById('artifact-input-img');
+            const previewSpecs = document.getElementById('artifact-input-specs');
+
+            const statusBanner = document.getElementById('artifact-processing-status');
+            const statusTitle = document.getElementById('artifact-status-title');
+            const statusDesc = document.getElementById('artifact-status-desc');
+
+            const resultsWrapper = document.getElementById('artifact-results-wrapper');
+            const kpiCount = document.getElementById('kpi-item-count');
+            const kpiAvgConf = document.getElementById('kpi-avg-conf');
+
+            const imgDetection = document.getElementById('img-output-detection');
+            const imgSegmentation = document.getElementById('img-output-segmentation');
+            const btnDlDetection = document.getElementById('btn-dl-detection');
+            const btnDlSegmentation = document.getElementById('btn-dl-segmentation');
+
+            const galleryContainer = document.getElementById('extracted-gallery-container');
+            const jsonDisplay = document.getElementById('results-json-display');
+            const btnCopyJson = document.getElementById('btn-copy-json');
+
+            let currentArtifactFile = null;
+
+            function setArtifactFile(file, sourceName) {
+                currentArtifactFile = file;
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    previewImg.src = e.target.result;
+                    previewBox.style.display = 'block';
+                    previewSpecs.textContent = `${sourceName || file.name} (${(file.size / 1024).toFixed(1)} KB)`;
+                    btnRun.disabled = false;
+                    showToast(`📥 Loaded: ${sourceName || file.name}`);
+                };
+                reader.readAsDataURL(file);
+            }
+
+            if (dropZone && fileInput) {
+                dropZone.addEventListener('click', () => fileInput.click());
+                fileInput.addEventListener('change', (e) => {
+                    if (e.target.files && e.target.files[0]) {
+                        setArtifactFile(e.target.files[0], e.target.files[0].name);
+                    }
+                });
+
+                dropZone.addEventListener('dragover', (e) => {
+                    e.preventDefault();
+                    dropZone.style.borderColor = 'var(--primary-emerald)';
+                    dropZone.style.background = 'rgba(16, 185, 129, 0.08)';
+                });
+
+                dropZone.addEventListener('dragleave', () => {
+                    dropZone.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                    dropZone.style.background = '';
+                });
+
+                dropZone.addEventListener('drop', (e) => {
+                    e.preventDefault();
+                    dropZone.style.borderColor = 'rgba(255, 255, 255, 0.1)';
+                    dropZone.style.background = '';
+                    if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                        setArtifactFile(e.dataTransfer.files[0], e.dataTransfer.files[0].name);
+                    }
+                });
+            }
+
+            // Load Sample
+            if (btnLoadSample) {
+                btnLoadSample.addEventListener('click', async () => {
+                    try {
+                        btnLoadSample.disabled = true;
+                        btnLoadSample.innerHTML = '<span>⏳ Loading Sample...</span>';
+                        const res = await fetch('/api/artifacts/sample');
+                        if (!res.ok) throw new Error('Sample not found');
+                        const blob = await res.blob();
+                        const sampleFile = new File([blob], 'test_museum_jewelry.jpg', { type: 'image/jpeg' });
+                        setArtifactFile(sampleFile, 'test_museum_jewelry.jpg (Museum Showcase)');
+                    } catch (err) {
+                        console.error('Failed to load sample:', err);
+                        showToast('❌ Failed to load showcase sample.');
+                    } finally {
+                        btnLoadSample.disabled = false;
+                        btnLoadSample.innerHTML = '<span>✨ Load Showcase Sample</span>';
+                    }
+                });
+            }
+
+            // Run Pipeline
+            if (btnRun) {
+                btnRun.addEventListener('click', async () => {
+                    if (!currentArtifactFile) return;
+
+                    try {
+                        btnRun.disabled = true;
+                        statusBanner.style.display = 'flex';
+                        statusTitle.textContent = 'Running Segmentation Pipeline...';
+                        statusDesc.textContent = 'Detecting items, isolating individual masks, and extracting transparent RGBA crops...';
+                        resultsWrapper.style.display = 'none';
+
+                        const formData = new FormData();
+                        formData.append('image', currentArtifactFile);
+
+                        const response = await fetch('/api/artifacts/segment', {
+                            method: 'POST',
+                            body: formData
+                        });
+
+                        const data = await response.json();
+                        if (!response.ok || !data.success) {
+                            throw new Error(data.error || 'Pipeline execution failed');
+                        }
+
+                        // Success - Render outputs
+                        renderPipelineResults(data);
+                        showToast(`✅ Segmented ${data.num_items || (data.items ? data.items.length : 0)} artifacts successfully!`);
+
+                    } catch (err) {
+                        console.error('Artifact pipeline error:', err);
+                        showToast(`❌ Error: ${err.message || 'Pipeline failed'}`);
+                    } finally {
+                        btnRun.disabled = false;
+                        statusBanner.style.display = 'none';
+                    }
+                });
+            }
+
+            function renderPipelineResults(data) {
+                const items = data.items || [];
+                const resJson = data.results_json || { items: [] };
+
+                // KPI Strip
+                kpiCount.textContent = items.length;
+                if (items.length > 0) {
+                    const avg = items.reduce((sum, it) => sum + (it.confidence || 0), 0) / items.length;
+                    kpiAvgConf.textContent = Math.round(avg * 100) + '%';
+                } else {
+                    kpiAvgConf.textContent = '0%';
+                }
+
+                // OUTPUT 1: Detection Image
+                if (data.detection_image) {
+                    imgDetection.src = data.detection_image;
+                    btnDlDetection.href = '/outputs/detection.jpg?t=' + Date.now();
+                }
+
+                // OUTPUT 2: Segmentation Image
+                if (data.segmentation_image) {
+                    imgSegmentation.src = data.segmentation_image;
+                    btnDlSegmentation.href = '/outputs/segmentation.jpg?t=' + Date.now();
+                }
+
+                // OUTPUT 3: Extracted Objects Cards Gallery
+                galleryContainer.innerHTML = '';
+                if (items.length === 0) {
+                    galleryContainer.innerHTML = '<div style="color: var(--text-muted); font-size: 0.9rem; grid-column: 1/-1; text-align: center; padding: 20px;">No artifacts detected in the image.</div>';
+                } else {
+                    items.forEach(item => {
+                        const card = document.createElement('div');
+                        card.className = 'extracted-item-card';
+
+                        const confPct = Math.round((item.confidence || 0) * 100);
+                        const imgSrc = item.image_base64 || item.url || `/outputs/${item.segmented_image}`;
+                        const bboxStr = item.bbox ? `bbox: [${item.bbox.join(', ')}]` : '';
+
+                        card.innerHTML = `
+                            <div class="extracted-meta-row">
+                                <span class="item-id-pill">${item.id || 'Item'}</span>
+                                <span class="item-conf-badge">${confPct}% conf</span>
+                            </div>
+                            <div class="item-class-title">${item.class || 'Artifact'}</div>
+                            <div class="extracted-image-box transparent-checkerboard">
+                                <img src="${imgSrc}" alt="${item.id}">
+                            </div>
+                            <div style="margin-top: auto;">
+                                <div style="font-size: 0.76rem; color: #94a3b8; display: flex; justify-content: space-between; align-items: center;">
+                                    <span>Class: <strong style="color:#fff;">${item.class || 'Artifact'}</strong></span>
+                                    <span>Confidence: <strong style="color:#34d399;">${confPct}%</strong></span>
+                                </div>
+                                <div class="item-bbox-txt">${bboxStr}</div>
+                                <a href="${item.url || `/outputs/${item.segmented_image}`}" download="${item.id}.png" target="_blank" class="btn-download-crop">
+                                    ⬇️ Download ${item.id}.png
+                                </a>
+                            </div>
+                        `;
+                        galleryContainer.appendChild(card);
+                    });
+                }
+
+                // results.json pre display
+                jsonDisplay.textContent = JSON.stringify(resJson, null, 2);
+
+                // Show wrapper
+                resultsWrapper.style.display = 'flex';
+                resultsWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }
+
+            // Copy JSON button
+            if (btnCopyJson) {
+                btnCopyJson.addEventListener('click', () => {
+                    const text = jsonDisplay.textContent;
+                    if (navigator.clipboard) {
+                        navigator.clipboard.writeText(text).then(() => {
+                            showToast('📋 results.json copied to clipboard!');
+                        });
+                    }
+                });
+            }
+
+        })();
 
     </script>
 

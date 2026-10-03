@@ -1,0 +1,40 @@
+{
+  "items": [
+    {
+      "id": "Item_01",
+      "class": "Bracelet",
+      "confidence": 0.92,
+      "bbox": [
+        531,
+        174,
+        711,
+        326
+      ],
+      "segmented_image": "objects/Item_01.png"
+    },
+    {
+      "id": "Item_02",
+      "class": "Necklace",
+      "confidence": 0.91,
+      "bbox": [
+        137,
+        215,
+        385,
+        340
+      ],
+      "segmented_image": "objects/Item_02.png"
+    },
+    {
+      "id": "Item_03",
+      "class": "Pendant",
+      "confidence": 0.89,
+      "bbox": [
+        390,
+        435,
+        512,
+        523
+      ],
+      "segmented_image": "objects/Item_03.png"
+    }
+  ]
+}

@@ -12,6 +12,8 @@ atlas-credentials.env
 temp_uploads/
 expanded_dataset/
 runs/
+uploads/candidates/
+*.log
 
 # ─── Large training data not needed for serving ───────────────────────────────
 egypt-landmarks-3-classes/
