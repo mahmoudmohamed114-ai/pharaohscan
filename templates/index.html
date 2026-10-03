@@ -1458,8 +1458,13 @@
                     🏛️ Detect & Find Posts
                 </button>
 
-                <div class="preview-img-container" id="preview-box" style="display: none;">
+                <div class="preview-img-container" id="preview-box" style="display: none; position: relative; flex-direction: column; align-items: center;">
                     <img id="preview-image" src="" alt="Landmark Preview">
+                    <div id="seg-toggle-container" style="display: none; justify-content: center; gap: 8px; margin-top: 10px; width: 100%;">
+                        <button id="btn-toggle-mask" type="button" style="background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.5); color: #c7d2fe; font-size: 0.78rem; font-weight: 600; border-radius: 20px; padding: 6px 14px; cursor: pointer; display: inline-flex; align-items: center; gap: 6px; transition: all 0.2s;">
+                            <span>🖼️ View Original Photo</span>
+                        </button>
+                    </div>
                 </div>
 
                 <!-- ── Locked Sensor Pose Anchor Card (Captured at Photo Snap) ── -->
@@ -2165,8 +2170,13 @@
             selectedFile = file;
             const reader = new FileReader();
             reader.onload = (e) => {
+                window.originalPhotoDataUrl = e.target.result;
+                window.segmentedPhotoDataUrl = null;
+                window.currentPreviewMode = 'original';
                 previewImage.src = e.target.result;
                 previewBox.style.display = 'flex';
+                const toggleCont = document.getElementById('seg-toggle-container');
+                if (toggleCont) toggleCont.style.display = 'none';
                 btnDetect.disabled = false;
                 document.getElementById('result-container').style.display = 'none';
 
@@ -2267,6 +2277,18 @@
         document.addEventListener('click', (e) => {
             if (e.target.id === 'btn-cancel-camera') closeCamera();
             if (e.target.id === 'btn-snap') snapPhoto();
+            if (e.target.closest('#btn-toggle-mask')) {
+                const btn = document.getElementById('btn-toggle-mask');
+                if (window.currentPreviewMode === 'segmented' && window.originalPhotoDataUrl) {
+                    previewImage.src = window.originalPhotoDataUrl;
+                    window.currentPreviewMode = 'original';
+                    if (btn) btn.innerHTML = '<span>✨ View Segmented Mask</span>';
+                } else if (window.segmentedPhotoDataUrl) {
+                    previewImage.src = window.segmentedPhotoDataUrl;
+                    window.currentPreviewMode = 'segmented';
+                    if (btn) btn.innerHTML = '<span>🖼️ View Original Photo</span>';
+                }
+            }
         });
 
         btnDetect.addEventListener('click', async () => {
@@ -2365,7 +2387,15 @@
 
             // Show annotated image
             if (data.image) {
+                window.segmentedPhotoDataUrl = data.image;
+                window.currentPreviewMode = 'segmented';
                 previewImage.src = data.image;
+                const toggleCont = document.getElementById('seg-toggle-container');
+                const toggleBtn = document.getElementById('btn-toggle-mask');
+                if (toggleCont && window.originalPhotoDataUrl) {
+                    toggleCont.style.display = 'flex';
+                    if (toggleBtn) toggleBtn.innerHTML = '<span>🖼️ View Original Photo</span>';
+                }
             }
 
             document.getElementById('result-container').style.display = 'block';
@@ -2473,6 +2503,22 @@
                 const det = data.detections && data.detections[0] ? data.detections[0] : { class: 'Landmark', confidence: '99%' };
                 document.getElementById('known-landmark-title').innerText = `🏛️ ${det.class}`;
                 document.getElementById('known-confidence').innerText = `Confidence: ${det.confidence} (${data.recognition_method || 'YOLO'})`;
+
+                // Segmentation indicator badge
+                let segBadge = document.getElementById('known-seg-badge');
+                if (data.segmentation && data.segmentation.enabled) {
+                    if (!segBadge) {
+                        segBadge = document.createElement('div');
+                        segBadge.id = 'known-seg-badge';
+                        segBadge.style.cssText = 'display:inline-flex;align-items:center;gap:6px;padding:4px 10px;margin-bottom:12px;background:rgba(99,102,241,0.15);border:1px solid rgba(99,102,241,0.4);border-radius:20px;font-size:0.75rem;color:#a5b4fc;font-weight:600;';
+                        document.getElementById('known-result-box').insertBefore(segBadge, document.getElementById('known-landmark-title'));
+                    }
+                    const methodStr = data.segmentation.method || 'Visual Instance Mask';
+                    segBadge.innerHTML = `✨ <strong>Visual Segmentation Active</strong> &nbsp;·&nbsp; ${methodStr}`;
+                    segBadge.style.display = 'inline-flex';
+                } else if (segBadge) {
+                    segBadge.style.display = 'none';
+                }
 
                 if (data.is_oneshot) {
                     document.getElementById('known-badge').innerText = `🎯 Confirmed Custom Class (One-Shot Learned)`;

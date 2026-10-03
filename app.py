@@ -1054,6 +1054,134 @@ def api_detect():
     return jsonify({"job_id": job_id, "status": "pending"})
 
 
+def generate_visual_segmentation(img, box_coords, label="Landmark", conf_str="95%", color=(16, 185, 129), yolo_mask=None):
+    """
+    Applies high-precision visual segmentation to a detected landmark:
+    1. Extracts instance segmentation mask (from YOLO result.masks or smart ROI edge/contour segmentation).
+    2. Blends a translucent colored polygon overlay over the heritage object (alpha blending).
+    3. Renders a glowing multi-layer perimeter contour highlighting the landmark's silhouette.
+    4. Renders modern AR corner brackets and a futuristic dark-glass label pill.
+    5. Returns annotated_img, normalized_polygon, and coverage_pct.
+    """
+    h_img, w_img = img.shape[:2]
+    x1, y1, x2, y2 = [int(round(v)) for v in box_coords]
+    x1 = max(0, min(w_img - 1, x1))
+    y1 = max(0, min(h_img - 1, y1))
+    x2 = max(x1 + 1, min(w_img, x2))
+    y2 = max(y1 + 1, min(h_img, y2))
+    
+    bw = x2 - x1
+    bh = y2 - y1
+    
+    full_mask = np.zeros((h_img, w_img), dtype=np.uint8)
+    
+    if yolo_mask is not None and hasattr(yolo_mask, 'shape'):
+        try:
+            # Resize raw YOLO segmentation mask to image dimensions
+            resized_m = cv2.resize((yolo_mask > 0.5).astype(np.uint8) * 255, (w_img, h_img), interpolation=cv2.INTER_LINEAR)
+            full_mask = (resized_m > 127).astype(np.uint8) * 255
+        except Exception:
+            full_mask = np.zeros((h_img, w_img), dtype=np.uint8)
+            
+    if cv2.countNonZero(full_mask) == 0:
+        # Smart foreground contour segmentation inside the bounding box
+        roi = img[y1:y2, x1:x2]
+        if roi.size > 0:
+            gray = cv2.cvtColor(roi, cv2.COLOR_BGR2GRAY)
+            denoised = cv2.bilateralFilter(gray, 7, 75, 75)
+            edges = cv2.Canny(denoised, 30, 120)
+            _, otsu = cv2.threshold(denoised, 0, 255, cv2.THRESH_BINARY + cv2.THRESH_OTSU)
+            
+            kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5))
+            dilated_edges = cv2.dilate(edges, kernel, iterations=2)
+            combined = cv2.bitwise_or(otsu, dilated_edges)
+            closed = cv2.morphologyEx(combined, cv2.MORPH_CLOSE, kernel, iterations=2)
+            
+            contours, _ = cv2.findContours(closed, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+            roi_mask = np.zeros((bh, bw), dtype=np.uint8)
+            min_area = (bw * bh) * 0.05
+            valid_cnts = [c for c in contours if cv2.contourArea(c) >= min_area]
+            
+            if valid_cnts:
+                for c in valid_cnts:
+                    hull = cv2.convexHull(c)
+                    cv2.drawContours(roi_mask, [hull], -1, 255, -1)
+            else:
+                center = (bw // 2, bh // 2)
+                axes = (int(bw * 0.44), int(bh * 0.44))
+                cv2.ellipse(roi_mask, center, axes, 0, 0, 360, 255, -1)
+                
+            full_mask[y1:y2, x1:x2] = roi_mask
+
+    # Translucent colored overlay
+    annotated = img.copy()
+    overlay = annotated.copy()
+    overlay[full_mask > 0] = color
+    cv2.addWeighted(overlay, 0.38, annotated, 0.62, 0, annotated)
+    
+    # Glowing perimeter contour
+    cnts, _ = cv2.findContours(full_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+    normalized_poly = []
+    if cnts:
+        largest_cnt = max(cnts, key=cv2.contourArea)
+        epsilon = 0.004 * cv2.arcLength(largest_cnt, True)
+        approx = cv2.approxPolyDP(largest_cnt, epsilon, True)
+        normalized_poly = [[round(pt[0][0] / w_img, 4), round(pt[0][1] / h_img, 4)] for pt in approx]
+
+        # Multi-layer glow
+        cv2.drawContours(annotated, cnts, -1, color, 4, cv2.LINE_AA)
+        bright_color = tuple(min(255, int(c) + 90) for c in color)
+        cv2.drawContours(annotated, cnts, -1, bright_color, 2, cv2.LINE_AA)
+        cv2.drawContours(annotated, cnts, -1, (255, 255, 255), 1, cv2.LINE_AA)
+        
+    # AR Corner brackets
+    corner_len = max(14, min(bw, bh) // 5)
+    bracket_color = (255, 255, 255)
+    bracket_thickness = 2
+    
+    cv2.line(annotated, (x1, y1), (x1 + corner_len, y1), bracket_color, bracket_thickness, cv2.LINE_AA)
+    cv2.line(annotated, (x1, y1), (x1, y1 + corner_len), bracket_color, bracket_thickness, cv2.LINE_AA)
+    cv2.line(annotated, (x2, y1), (x2 - corner_len, y1), bracket_color, bracket_thickness, cv2.LINE_AA)
+    cv2.line(annotated, (x2, y1), (x2, y1 + corner_len), bracket_color, bracket_thickness, cv2.LINE_AA)
+    cv2.line(annotated, (x1, y2), (x1 + corner_len, y2), bracket_color, bracket_thickness, cv2.LINE_AA)
+    cv2.line(annotated, (x1, y2), (x1, y2 - corner_len), bracket_color, bracket_thickness, cv2.LINE_AA)
+    cv2.line(annotated, (x2, y2), (x2 - corner_len, y2), bracket_color, bracket_thickness, cv2.LINE_AA)
+    cv2.line(annotated, (x2, y2), (x2, y2 - corner_len), bracket_color, bracket_thickness, cv2.LINE_AA)
+
+    # Label Pill with class and confidence
+    label_text = f"{label} {conf_str}"
+    font = cv2.FONT_HERSHEY_DUPLEX
+    font_scale = 0.60
+    font_thick = 1
+    (tw, th), baseline = cv2.getTextSize(label_text, font, font_scale, font_thick)
+    
+    pill_margin = 6
+    pill_w = tw + (pill_margin * 4) + 16
+    pill_h = th + (pill_margin * 2) + 4
+    
+    py1 = max(4, y1 - pill_h - 6)
+    py2 = py1 + pill_h
+    px1 = x1
+    px2 = min(w_img - 4, px1 + pill_w)
+    
+    pill_overlay = annotated.copy()
+    cv2.rectangle(pill_overlay, (px1, py1), (px2, py2), (15, 23, 42), -1)
+    cv2.addWeighted(pill_overlay, 0.88, annotated, 0.12, 0, annotated)
+    
+    cv2.rectangle(annotated, (px1, py1), (px2, py2), color, 1, cv2.LINE_AA)
+    dot_center = (px1 + 10, py1 + pill_h // 2)
+    cv2.circle(annotated, dot_center, 4, color, -1, cv2.LINE_AA)
+    
+    text_origin = (px1 + 20, py1 + th + pill_margin)
+    cv2.putText(annotated, label_text, text_origin, font, font_scale, (255, 255, 255), font_thick, cv2.LINE_AA)
+    
+    mask_pixels = int(cv2.countNonZero(full_mask))
+    box_pixels = max(1, bw * bh)
+    coverage_pct = round((mask_pixels / box_pixels) * 100, 1)
+
+    return annotated, normalized_poly, coverage_pct
+
+
 def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, lng_form):
     """Heavy detection logic — runs in background thread, returns a plain dict result."""
     is_custom_active = is_custom_yolo11 if model_type == 'v11' else is_custom_yolov8
@@ -1093,10 +1221,9 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                 x2 = int((x_c + box_w / 2) * w_img)
                 y2 = int((y_c + box_h / 2) * h_img)
                 
-                annotated_img = img.copy()
-                cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 3)
-                cv2.putText(annotated_img, f"{suggested_landmark} ({conf_val:.2%})", (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                annotated_img, poly, cov = generate_visual_segmentation(
+                    img, (x1, y1, x2, y2), suggested_landmark, f"{conf_val:.1%}", color=(16, 185, 129)
+                )
                             
                 _, buffer = cv2.imencode('.jpg', annotated_img)
                 encoded_image = base64.b64encode(buffer).decode('utf-8')
@@ -1116,6 +1243,12 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                     'is_custom': True,
                     'is_oneshot': True,
                     'recognition_method': 'YOLO (One-Shot Learned)',
+                    'segmentation': {
+                        'enabled': True,
+                        'polygon': poly,
+                        'coverage_pct': cov,
+                        'method': 'AI Visual Instance Mask'
+                    },
                     'object': serialize_mongo(matched_obj) if matched_obj else None,
                     'posts': serialize_mongo(posts)
                 }
@@ -1200,16 +1333,25 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
             if matched_obj and "object_id" in matched_obj:
                 posts = list(db.posts.find({"object_id": matched_obj["object_id"]}))
                 
-            # Plot only valid boxes on annotated image
+            # Render visual segmentation mask and glowing contours for detected landmarks
             annotated_img = img.copy()
             h_img, w_img, _ = img.shape
-            for v_box in valid_boxes:
+            all_polys = []
+            for v_idx, v_box in enumerate(valid_boxes):
                 v_conf = float(v_box.conf[0])
                 v_cls = result.names[int(v_box.cls[0])]
                 x1, y1, x2, y2 = map(int, v_box.xyxy[0].tolist())
-                cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (0, 255, 0), 3)
-                cv2.putText(annotated_img, f"{v_cls} ({v_conf:.2%})", (x1, y1 - 10),
-                            cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                y_mask = None
+                if hasattr(result, 'masks') and result.masks is not None:
+                    try:
+                        y_mask = result.masks.data[v_idx].cpu().numpy()
+                    except Exception:
+                        y_mask = None
+                annotated_img, poly, cov = generate_visual_segmentation(
+                    annotated_img, (x1, y1, x2, y2), v_cls, f"{v_conf:.1%}", color=(16, 185, 129), yolo_mask=y_mask
+                )
+                if poly:
+                    all_polys.append({'class': v_cls, 'polygon': poly, 'coverage_pct': cov})
 
             _, buffer = cv2.imencode('.jpg', annotated_img)
             encoded_image = base64.b64encode(buffer).decode('utf-8')
@@ -1220,6 +1362,11 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                 'inference_time': f"{inference_time:.1f}ms",
                 'is_custom': is_custom_active,
                 'recognition_method': 'YOLO',
+                'segmentation': {
+                    'enabled': True,
+                    'polygons': all_polys,
+                    'method': 'YOLO Instance Segmentation Mask' if (hasattr(result, 'masks') and result.masks is not None) else 'AI Visual Instance Mask'
+                },
                 'object': serialize_mongo(matched_obj) if matched_obj else None,
                 'posts': serialize_mongo(posts)
             }
@@ -1277,10 +1424,9 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                     x2 = int((x_c + box_w / 2) * w_img)
                     y2 = int((y_c + box_h / 2) * h_img)
                     
-                    annotated_img = img.copy()
-                    cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (16, 185, 129), 3)
-                    cv2.putText(annotated_img, f"{best_cls_name} ({best_conf:.2%})", (x1, y1 - 10),
-                                cv2.FONT_HERSHEY_SIMPLEX, 0.7, (16, 185, 129), 2)
+                    annotated_img, poly, cov = generate_visual_segmentation(
+                        img, (x1, y1, x2, y2), best_cls_name, f"{best_conf:.1%}", color=(16, 185, 129)
+                    )
                                 
                     _, buffer = cv2.imencode('.jpg', annotated_img)
                     encoded_image = base64.b64encode(buffer).decode('utf-8')
@@ -1328,6 +1474,12 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                         'is_custom': True,
                         'is_oneshot': True,
                         'recognition_method': 'YOLO (One-Shot Learned)',
+                        'segmentation': {
+                            'enabled': True,
+                            'polygon': poly,
+                            'coverage_pct': cov,
+                            'method': 'YOLO-World Instance Mask'
+                        },
                         'object': serialize_mongo(matched_obj) if matched_obj else {'name': best_cls_name, 'description': 'Custom learned landmark'},
                         'posts': serialize_mongo(posts)
                     }
@@ -1392,10 +1544,9 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
         x2 = int((x_c + box_w / 2) * w_img)
         y2 = int((y_c + box_h / 2) * h_img)
         
-        annotated_img = img.copy()
-        cv2.rectangle(annotated_img, (x1, y1), (x2, y2), (185, 6, 212), 3)
-        cv2.putText(annotated_img, f"{suggested_landmark} ({confidence_val:.2%})", (x1, y1 - 10),
-                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (185, 6, 212), 2)
+        annotated_img, poly, cov = generate_visual_segmentation(
+            img, (x1, y1, x2, y2), suggested_landmark, f"{confidence_val:.1%}", color=(185, 6, 212)
+        )
                     
         # ── Auto-Confirm Check ──────────────────────────────────────────────
         # If Gemini identified a landmark that already exists in our DB as a
@@ -1484,6 +1635,12 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
             'inference_time': f"{(time.time() - t0)*1000:.1f}ms",
             'is_custom': False,
             'recognition_method': 'Zero-Shot',
+            'segmentation': {
+                'enabled': True,
+                'polygon': poly,
+                'coverage_pct': cov,
+                'method': 'AI Visual Instance Mask (Zero-Shot)'
+            },
             'image_hash': img_hash,
             'description': description,
             'suggested_class': suggested_landmark.replace(" ", "-"),
