@@ -414,8 +414,9 @@ latitude and longitude must be real decimal numbers (e.g. 48.8584, 2.2945) or nu
     b64_data = base64.b64encode(image_bytes).decode('utf-8')
     mime = mime_type if mime_type else "image/jpeg"
     
-    # 1. Try Direct REST endpoint with available Gemini models
-    for model_name in ["gemini-2.5-flash", "gemini-3.5-flash", "gemini-flash-latest", "gemini-2.5-pro"]:
+    # 1. Try Direct REST endpoint with available Gemini models in priority order
+    last_error = "No error"
+    for model_name in ["gemini-3.5-flash-lite", "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-flash-latest"]:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
             payload = {
@@ -424,36 +425,54 @@ latitude and longitude must be real decimal numbers (e.g. 48.8584, 2.2945) or nu
                         {"text": prompt},
                         {"inline_data": {"mime_type": mime, "data": b64_data}}
                     ]
-                }]
+                }],
+                "generationConfig": {
+                    "response_mime_type": "application/json"
+                }
             }
             req = urllib.request.Request(
                 url,
                 data=json.dumps(payload).encode('utf-8'),
-                headers={"Content-Type": "application/json"}
+                headers={"Content-Type": "application/json", "User-Agent": "PharaohScan/1.0"}
             )
-            with urllib.request.urlopen(req, timeout=15) as response:
+            with urllib.request.urlopen(req, timeout=20) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
                 text = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 if text.startswith("```"):
                     text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.IGNORECASE)
                     text = re.sub(r'\s*```$', '', text, flags=re.IGNORECASE)
-                return json.loads(text.strip())
+                parsed = json.loads(text.strip())
+                print(f"[INFO] Gemini Direct REST ({model_name}) succeeded: {parsed.get('possibleLandmark')}")
+                return parsed
+        except urllib.error.HTTPError as he:
+            try:
+                err_msg = he.read().decode('utf-8', errors='ignore')[:120].replace('\n', ' ')
+            except:
+                err_msg = str(he)
+            last_error = f"{model_name} HTTP {he.code}: {err_msg}"
+            print(f"[DEBUG] Gemini Direct REST ({model_name}) attempt HTTP {he.code}: {err_msg}")
+            continue
         except Exception as e:
+            last_error = f"{model_name}: {str(e)}"
             print(f"[DEBUG] Gemini Direct REST ({model_name}) attempt: {e}")
             continue
 
-    # 2. Try SDK with gemini-1.5-flash-latest
-    try:
-        model = genai.GenerativeModel("gemini-1.5-flash-latest")
-        img = Image.open(io.BytesIO(image_bytes))
-        resp = model.generate_content([prompt, img])
-        text = resp.text.strip()
-        if text.startswith("```"):
-            text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.IGNORECASE)
-            text = re.sub(r'\s*```$', '', text, flags=re.IGNORECASE)
-        return json.loads(text.strip())
-    except Exception as e:
-        print(f"[DEBUG] Gemini SDK attempt: {e}")
+    # 2. Try SDK with working models
+    for sdk_model in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]:
+        try:
+            model = genai.GenerativeModel(sdk_model)
+            img = Image.open(io.BytesIO(image_bytes))
+            resp = model.generate_content([prompt, img])
+            text = resp.text.strip()
+            if text.startswith("```"):
+                text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.IGNORECASE)
+                text = re.sub(r'\s*```$', '', text, flags=re.IGNORECASE)
+            parsed = json.loads(text.strip())
+            print(f"[INFO] Gemini SDK ({sdk_model}) succeeded: {parsed.get('possibleLandmark')}")
+            return parsed
+        except Exception as e:
+            last_error = f"SDK {sdk_model}: {str(e)}"
+            print(f"[DEBUG] Gemini SDK ({sdk_model}) attempt: {e}")
 
     # 3. Fallback
     return {
@@ -461,7 +480,7 @@ latitude and longitude must be real decimal numbers (e.g. 48.8584, 2.2945) or nu
         "possibleLandmark": "Unknown",
         "isNewLandmark": False,
         "confidence": 0,
-        "reason": "Could not identify landmark while offline."
+        "reason": f"Could not identify landmark while offline. ({last_error})"
     }
 
 # ─── Dataset & Bounding Box Helpers ──────────────────────────────────────────
