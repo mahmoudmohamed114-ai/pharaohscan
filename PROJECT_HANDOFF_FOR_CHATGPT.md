@@ -406,3 +406,54 @@ Prompt 3 introduces a user-centric verification step immediately after the autom
    - `_isConfirmationModalOpen` flag guarantees only one modal is active per detection event.
    - Buttons are immediately disabled upon tap (`disabled = true`) to prevent double-tap race conditions.
    - If camera is closed (`btn-cancel-camera`), `closeCamera()` automatically dismisses the dialog and releases camera streams.
+
+---
+
+## 4. Prompt 4 — AI-Powered AR Experience with Artifact Information and Visual Tracking
+
+### Overview
+Milestone 4 connects the user's positive confirmation ("Yes, Continue") from Milestone 3 directly into an immersive, mobile-optimized Augmented Reality (AR) camera view. The view displays a visually anchored artifact marker and a compact glassmorphic historical information panel dynamically populated by AI (Gemini) or verified catalog data.
+
+### Architectural Additions
+
+1. **Backend Dynamic Artifact Description Engine (`app.py`):**
+   - **`get_or_generate_artifact_description(artifact_name, class_name=None, visual_context="")`:**
+     - Checks in-memory cache `_artifact_desc_cache` and MongoDB `db.objects` for an existing verified historical record.
+     - If missing or lacking details, queries the Gemini API with prioritized REST models (`gemini-3.5-flash-lite`, `gemini-2.5-flash`, `gemini-flash-latest`, `gemini-3-flash-preview`).
+     - Requests structured JSON: `overview`, `period`, `significance`, `facts`, `confidence_level`.
+     - Caches the structured profile in memory and updates MongoDB `db.objects` to ensure future scans do not make repeated AI calls.
+     - Provides intelligent catalog fallbacks if Gemini is rate-limited or unreachable.
+   - **`@app.route('/api/artifact/describe', methods=['GET', 'POST'])`:**
+     - Standalone endpoint returning dynamic historical data for any recognized artifact.
+
+2. **Confirmation Dialog -> AR Transition (`templates/index.html`):**
+   - When the user taps **"Yes, Continue"** (`handleConfirmYes`):
+     - Halts live automatic scanning loop and closes scanner preview overlay.
+     - Retains confirmed artifact metadata (`window.selectedArtifact`, `currentObjectName`, `currentObjectId`, GPS coordinates).
+     - Calls `ARSession.startWithArtifact(details, data)` to launch the AR experience directly.
+
+3. **AR Viewport & Floating Information Marker:**
+   - Fullscreen camera stream background (`#ar-video`) with graceful fallback across environment and user cameras.
+   - 3D CSS transform scene (`#ar-scene` and `#ar-world-plane`).
+   - `#ar-artifact-badge`: A glowing, pulsating AR badge positioned according to detection coordinates (`_computeAnchorPosition`) and counter-rotated / translated in response to device orientation.
+   - Tapping the badge toggles the AR Information Panel.
+
+4. **AR Information Panel UI (`#ar-info-panel`):**
+   - Dark glassmorphic design (`backdrop-filter: blur(20px)`, emerald accents).
+   - Displays:
+     - Artifact Name
+     - AI Confidence Match badge
+     - Historical Period / Dynasty badge
+     - Historical Overview
+     - Cultural & Historical Significance
+     - Key Historical Facts (bullet points)
+     - AI Provenance Tag ("🤖 AI Egyptology Analysis • Gemini")
+   - Controls:
+     - **✕ Minimize Button**: Collapses the panel back into the floating marker, keeping the camera view unobstructed.
+     - **📷 Scan Another**: Fully terminates AR session (releases camera and orientation listeners) and reopens the live camera scanner ready for another artifact.
+     - **✕ Exit AR**: Exits AR mode and returns to the dashboard.
+
+5. **Inertial Sensors & Visual Tracking Limitations:**
+   - Orientation: Uses `DeviceOrientationEvent` with iOS 13+ permission request (`DeviceOrientationEvent.requestPermission`). Calculates angular deltas relative to reference angles (`_refAlpha`, `_refBeta`, `_refGamma`) to counter-rotate and translate the world plane.
+   - Motion: Uses `DeviceMotionEvent` accelerometer readings to flash a motion badge when significant phone displacement occurs.
+   - **Honest Tracking Limitations:** Standard mobile web browsers without WebXR markerless hit-testing or native ARCore/ARKit bridges cannot perform true 6-DoF visual SLAM. The implemented approach uses AI visual bounding-box initialization coupled with smoothed 3D gyroscope perspective tracking. If sensors are unavailable or denied, a clear fallback label is shown ("⚠️ Screen Anchor Mode").

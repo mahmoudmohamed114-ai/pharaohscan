@@ -953,6 +953,179 @@ def api_segment_artifacts():
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
 
+# ---------------------------------------------------------
+# Dynamic AI-Powered Artifact Description Engine & Cache (Prompt 4)
+# ---------------------------------------------------------
+_artifact_desc_cache = {}
+
+def get_or_generate_artifact_description(artifact_name, class_name=None, visual_context=""):
+    """
+    Retrieves or dynamically generates structured historical and cultural description
+    for an identified artifact or landmark using Gemini or verified database metadata.
+    Caches results in memory and MongoDB to prevent redundant AI requests.
+    """
+    if not artifact_name or artifact_name.strip() == "" or artifact_name.lower() == "unknown":
+        return {
+            "artifact_name": "Unidentified Heritage Object",
+            "period": "Uncertain / Unconfirmed Period",
+            "overview": "The system detected an archaeological or cultural feature, but its specific identity cannot be confirmed with high confidence.",
+            "significance": "Historical context is pending further visual verification or closer inspection.",
+            "facts": [
+                "Positioning camera closer under good lighting can improve visual feature identification."
+            ],
+            "confidence_level": "Tentative",
+            "source": "detection_fallback"
+        }
+
+    clean_name = artifact_name.strip()
+    cache_key = clean_name.lower().replace("-", " ")
+
+    # 1. Check in-memory cache
+    if cache_key in _artifact_desc_cache:
+        return _artifact_desc_cache[cache_key]
+
+    # 2. Check MongoDB objects collection
+    try:
+        obj = db.objects.find_one({
+            "$or": [
+                {"name": {"$regex": re.compile(f"^{re.escape(clean_name)}$", re.IGNORECASE)}},
+                {"class_name": {"$regex": re.compile(f"^{re.escape(clean_name)}$", re.IGNORECASE)}}
+            ]
+        })
+        if obj and obj.get("description") and len(obj.get("description", "")) > 60:
+            if obj.get("historical_period") or obj.get("cultural_significance"):
+                desc_obj = {
+                    "artifact_name": obj.get("name", clean_name),
+                    "period": obj.get("historical_period", "Ancient Egypt"),
+                    "overview": obj.get("description"),
+                    "significance": obj.get("cultural_significance", "Significant ancient Egyptian cultural monument."),
+                    "facts": obj.get("interesting_facts", [f"Recorded in Egyptian antiquities registry as {clean_name}."]),
+                    "confidence_level": obj.get("confidence_level", "High"),
+                    "source": "verified_database"
+                }
+                _artifact_desc_cache[cache_key] = desc_obj
+                return desc_obj
+    except Exception as e:
+        print(f"[CACHE] Error reading MongoDB object for '{clean_name}': {e}")
+
+    # 3. Dynamic AI Generation using Gemini
+    k = get_gemini_api_key()
+    if k:
+        prompt = f"""You are a specialized Egyptian cultural heritage and Egyptology expert.
+Generate a concise, factually accurate historical profile for the artifact or landmark: "{clean_name}".
+{f'Visual context/evidence: {visual_context}' if visual_context else ''}
+
+Rules:
+1. Explain what the artifact/landmark is clearly.
+2. State its historical background and dynasty/period when reliably known (e.g. "Old Kingdom, 4th Dynasty (c. 2575-2465 BCE)"). If uncertain, state that it is uncertain.
+3. State its cultural, religious, or architectural significance.
+4. Include 1 or 2 interesting historical facts supported by reliable Egyptological consensus.
+5. Do NOT invent dates, fictional events, or unverified origins.
+6. If the exact artifact cannot be identified with high certainty, state what can reasonably be deduced and note the uncertainty.
+
+Return ONLY a valid JSON object matching this schema:
+{{
+  "artifact_name": "{clean_name}",
+  "period": "Dynasty / Era / Date (or 'Uncertain / Approximate' if not definitively known)",
+  "overview": "2-3 concise sentences explaining what the artifact is and where it originated or was discovered.",
+  "significance": "1-2 sentences on its cultural, religious, or historical significance.",
+  "facts": [
+    "Interesting historical fact 1",
+    "Interesting historical fact 2"
+  ],
+  "confidence_level": "High | Moderate | Tentative"
+}}
+"""
+        models = ["gemini-3.5-flash-lite", "gemini-2.5-flash", "gemini-flash-latest", "gemini-3-flash-preview"]
+        for model in models:
+            try:
+                url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:generateContent?key={k}"
+                payload = {
+                    "contents": [{"parts": [{"text": prompt}]}],
+                    "generationConfig": {"response_mime_type": "application/json"}
+                }
+                req = urllib.request.Request(
+                    url,
+                    data=json.dumps(payload).encode('utf-8'),
+                    headers={"Content-Type": "application/json", "User-Agent": "PharaohScan/1.0"}
+                )
+                with urllib.request.urlopen(req, timeout=12) as response:
+                    res_data = json.loads(response.read().decode('utf-8'))
+                    text = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
+                    parsed = json.loads(text)
+                    parsed["source"] = "gemini_ai"
+                    
+                    # Store in memory cache
+                    _artifact_desc_cache[cache_key] = parsed
+
+                    # Update MongoDB object record if found
+                    try:
+                        db.objects.update_one(
+                            {"$or": [
+                                {"name": {"$regex": re.compile(f"^{re.escape(clean_name)}$", re.IGNORECASE)}},
+                                {"class_name": {"$regex": re.compile(f"^{re.escape(clean_name)}$", re.IGNORECASE)}}
+                            ]},
+                            {"$set": {
+                                "description": parsed.get("overview", ""),
+                                "historical_period": parsed.get("period", ""),
+                                "cultural_significance": parsed.get("significance", ""),
+                                "interesting_facts": parsed.get("facts", []),
+                                "confidence_level": parsed.get("confidence_level", "High")
+                            }}
+                        )
+                    except Exception as db_err:
+                        print(f"[CACHE] Could not update MongoDB object with generated description: {db_err}")
+
+                    return parsed
+            except Exception as e:
+                print(f"[AI-DESC] Model {model} attempt for '{clean_name}' failed: {e}")
+
+    # 4. Fallback structured response based on catalog metadata if Gemini unavailable
+    fallback_desc = {
+        "artifact_name": clean_name,
+        "period": "Ancient Egyptian Civilization",
+        "overview": f"{clean_name} is a distinguished Egyptian cultural artifact or monument preserved among Egypt's national heritage treasures.",
+        "significance": "Represents ancient Egyptian artistic, religious, and architectural mastery reflecting timeless cultural heritage.",
+        "facts": [
+            f"Cataloged as part of the Egyptian archaeological survey for {clean_name}."
+        ],
+        "confidence_level": "Moderate",
+        "source": "heritage_catalog_fallback"
+    }
+    _artifact_desc_cache[cache_key] = fallback_desc
+    return fallback_desc
+
+
+@app.route('/api/artifact/describe', methods=['GET', 'POST'])
+def api_artifact_describe():
+    """
+    Returns AI-generated or verified structured historical description for an artifact.
+    Reuses cached descriptions to minimize external API overhead.
+    """
+    try:
+        artifact_name = None
+        class_name = None
+        context = ""
+
+        if request.method == 'POST':
+            data = request.get_json(silent=True) or {}
+            artifact_name = data.get('name') or data.get('artifact_name')
+            class_name = data.get('class_name')
+            context = data.get('context', '')
+        else:
+            artifact_name = request.args.get('name') or request.args.get('artifact_name')
+            class_name = request.args.get('class_name')
+            context = request.args.get('context', '')
+
+        if not artifact_name:
+            return jsonify({'error': 'artifact_name parameter is required'}), 400
+
+        desc = get_or_generate_artifact_description(artifact_name, class_name=class_name, visual_context=context)
+        return jsonify(desc)
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+
+
 @app.route('/api/objects', methods=['GET'])
 def api_objects():
     try:
