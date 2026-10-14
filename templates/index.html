@@ -1750,6 +1750,9 @@
                 <button class="btn-camera" id="btn-camera" style="display:flex;">
                     📸 Take Photo with Camera
                 </button>
+                <button class="btn-enter-ar" id="btn-quick-ar" type="button" style="display:flex;">
+                    🥽 Launch Live AR Experience
+                </button>
 
                 <button class="btn-detect" id="btn-detect" disabled>
                     🏛️ Detect & Find Posts
@@ -2835,6 +2838,13 @@
 
         // ── Camera Capture (Supported on All Devices: Mobile & Desktop Webcams) ──
         const btnCamera = document.getElementById('btn-camera');
+        const btnQuickAR = document.getElementById('btn-quick-ar');
+        if (btnQuickAR) {
+            btnQuickAR.addEventListener('click', () => {
+                ARSession.load('Giza Heritage Explorer', 'Live AR Ready', 'Direct AR Mode');
+                ARSession.start();
+            });
+        }
         if (btnCamera) {
             btnCamera.style.display = 'flex';
         }
@@ -3826,10 +3836,9 @@
 
         // ── Helper: inject "Enter AR" button after successful recognition ────
         function attachARToResult(data) {
-            // On mobile only: inject "Enter AR View" button after detection
-            const isMobileDevice = /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
-            const hasCamera      = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
-            if (!isMobileDevice || !hasCamera) return;
+            // Available on all camera-supported devices (Mobile & Desktop)
+            const hasCamera = !!(navigator.mediaDevices && navigator.mediaDevices.getUserMedia);
+            if (!hasCamera) return;
 
             // Determine recognized artifact name and confidence
             let artifactName = null, confidence = null, method = null;
