@@ -3035,16 +3035,17 @@
 
         // ── Milestone 1: Live Camera Automatic AI Recognition Engine ──
         function startLiveScannerLoop() {
-            if (_scannerActive) return;
+            if (_scannerActive) { console.log('[SCANNER] Already active, skipping start'); return; }
             _scannerActive = true;
             _isScanJobPending = false;
+            console.log('[SCANNER] \u2705 Live scanner loop STARTED');
 
             setScannerUIState("Scanning for heritage landmarks...", false);
             const banner = document.getElementById('scanner-detected-banner');
             if (banner) banner.style.display = 'none';
 
-            // Controlled loop interval: 1800ms
-            _scannerTimer = setInterval(dispatchScannerFrame, 1800);
+            // Controlled loop interval: 2000ms
+            _scannerTimer = setInterval(dispatchScannerFrame, 2000);
         }
 
         function stopLiveScannerLoop() {
@@ -3054,6 +3055,7 @@
                 clearInterval(_scannerTimer);
                 _scannerTimer = null;
             }
+            console.log('[SCANNER] \u26D4 Live scanner loop STOPPED');
         }
 
         function setScannerUIState(text, isBusy) {
@@ -3066,13 +3068,21 @@
             }
         }
 
-        async function dispatchScannerFrame() {
-            if (!_scannerActive || _isScanJobPending) return;
+        let _scanJobSafetyTimer = null;
 
-            const video = document.getElementById('camera-video');
-            if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+        async function dispatchScannerFrame() {
+            if (!_scannerActive) { return; }
+            if (_isScanJobPending) {
+                console.log('[SCANNER] \u23F3 Skipping frame \u2014 previous job still pending');
                 return;
             }
+
+            const video = document.getElementById('camera-video');
+            if (!video) { console.warn('[SCANNER] \u274C No video element found'); return; }
+            if (video.readyState < 2) { console.log('[SCANNER] \u23F3 Video not ready yet (readyState=' + video.readyState + ')'); return; }
+            if (!video.videoWidth || !video.videoHeight) { console.warn('[SCANNER] \u274C Video has no dimensions'); return; }
+
+            console.log('[SCANNER] \uD83D\uDCF8 Capturing frame: ' + video.videoWidth + 'x' + video.videoHeight);
 
             // Downscale frame to max 640px dimension for high performance & low payload
             const maxDim = 640;
@@ -3096,9 +3106,23 @@
 
             // Compress to JPEG blob at 0.78 quality (~35-50KB)
             canvas.toBlob(async (blob) => {
-                if (!blob || !_scannerActive || _isScanJobPending) return;
+                if (!blob) { console.warn('[SCANNER] \u274C toBlob returned null'); return; }
+                if (!_scannerActive) { console.log('[SCANNER] Scanner stopped before blob ready'); return; }
+                if (_isScanJobPending) { console.log('[SCANNER] Job became pending during blob creation'); return; }
+
                 _isScanJobPending = true;
+                console.log('[SCANNER] \uD83D\uDCE4 Sending frame to /api/detect (blob size: ' + (blob.size/1024).toFixed(1) + 'KB)');
                 setScannerUIState("Analyzing with AI...", true);
+
+                // Safety timer: if _isScanJobPending is still true after 25s, force-reset it
+                if (_scanJobSafetyTimer) clearTimeout(_scanJobSafetyTimer);
+                _scanJobSafetyTimer = setTimeout(() => {
+                    if (_isScanJobPending) {
+                        console.warn('[SCANNER] \u26A0\uFE0F Safety timeout: force-resetting _isScanJobPending after 25s');
+                        _isScanJobPending = false;
+                        setScannerUIState("Scanning for heritage landmarks...", false);
+                    }
+                }, 25000);
 
                 const formData = new FormData();
                 formData.append('image', blob, 'live_frame.jpg');
@@ -3121,22 +3145,30 @@
                         body: formData
                     });
 
+                    console.log('[SCANNER] \uD83D\uDCE5 /api/detect response status: ' + res.status);
+
                     if (!res.ok) {
+                        console.error('[SCANNER] \u274C /api/detect failed with status ' + res.status);
                         _isScanJobPending = false;
                         setScannerUIState("Scanning for heritage landmarks...", false);
                         return;
                     }
 
                     const jobData = await res.json();
+                    console.log('[SCANNER] \uD83D\uDCE5 /api/detect response: ' + JSON.stringify(jobData).substring(0, 200));
+
                     if (!jobData.job_id) {
+                        console.log('[SCANNER] \u26A1 Immediate result (no job_id), processing...');
                         handleScannerResult(jobData);
                         return;
                     }
 
-                    // Poll the job endpoint safely with max 8 retries (~4.8s max)
+                    console.log('[SCANNER] \uD83D\uDD04 Got job_id: ' + jobData.job_id + ', starting poll...');
+                    // Poll the job endpoint safely with max 20 retries (~16s max for Gemini fallback)
                     pollScannerJob(jobData.job_id);
 
                 } catch (netErr) {
+                    console.error('[SCANNER] \u274C Network error: ' + (netErr.message || netErr));
                     _isScanJobPending = false;
                     setScannerUIState("Scanning for heritage landmarks...", false);
                 }
@@ -3145,9 +3177,10 @@
 
         function pollScannerJob(jobId) {
             let attempts = 0;
-            const maxAttempts = 8;
+            const maxAttempts = 20;
             const pollTimer = setInterval(async () => {
                 if (!_scannerActive) {
+                    console.log('[SCANNER] Scanner stopped during poll, aborting');
                     clearInterval(pollTimer);
                     _isScanJobPending = false;
                     return;
@@ -3155,8 +3188,11 @@
 
                 attempts++;
                 try {
-                    const res = await fetch(`/api/detect/result/${jobId}`);
+                    const res = await fetch('/api/detect/result/' + jobId);
+                    console.log('[SCANNER] \uD83D\uDD04 Poll #' + attempts + '/' + maxAttempts + ' for ' + jobId + ': status ' + res.status);
+
                     if (res.status === 404 || attempts >= maxAttempts) {
+                        console.warn('[SCANNER] \u26A0\uFE0F Poll exhausted (attempts=' + attempts + ', status=' + res.status + ')');
                         clearInterval(pollTimer);
                         _isScanJobPending = false;
                         setScannerUIState("Scanning for heritage landmarks...", false);
@@ -3168,40 +3204,59 @@
                         return; // Keep waiting
                     }
 
+                    console.log('[SCANNER] \u2705 Poll got result: ' + JSON.stringify(data).substring(0, 300));
                     clearInterval(pollTimer);
                     _isScanJobPending = false;
                     handleScannerResult(data);
 
                 } catch (e) {
+                    console.error('[SCANNER] \u274C Poll error: ' + (e.message || e));
                     clearInterval(pollTimer);
                     _isScanJobPending = false;
                     setScannerUIState("Scanning for heritage landmarks...", false);
                 }
-            }, 600);
+            }, 800);
         }
 
         function handleScannerResult(data) {
+            console.log('[SCANNER] \uD83C\uDFAF handleScannerResult called');
             if (!data || data.error) {
+                console.warn('[SCANNER] \u274C Result has error or is null: ' + (data ? data.error : 'null'));
                 setScannerUIState("Scanning for heritage landmarks...", false);
                 return;
             }
 
-            // Check if a landmark was recognized with sufficient confidence
-            const hasYoloMatch = data.detections && data.detections.length > 0 && !data.unknown;
-            const hasGeminiMatch = data.gemini && data.gemini.possibleLandmark && data.gemini.possibleLandmark !== 'Unknown' && (data.gemini.confidence >= 65 || data.auto_confirmed);
+            // Log the full result shape for debugging
+            console.log('[SCANNER] Result keys: ' + Object.keys(data).join(', '));
+            console.log('[SCANNER] detections: ' + JSON.stringify(data.detections || []).substring(0, 200));
+            console.log('[SCANNER] unknown: ' + data.unknown + ' | auto_confirmed: ' + data.auto_confirmed);
+            if (data.gemini) {
+                console.log('[SCANNER] gemini: ' + JSON.stringify(data.gemini).substring(0, 200));
+            }
 
-            if (hasYoloMatch || hasGeminiMatch) {
-                const landmarkName = hasYoloMatch ? data.detections[0].class : data.gemini.possibleLandmark;
+            // Check if a landmark was recognized - accept YOLO, auto-confirmed Gemini, OR high-confidence Gemini
+            const hasYoloMatch = data.detections && data.detections.length > 0 && !data.unknown;
+            const hasAutoConfirmed = data.auto_confirmed === true;
+            const hasGeminiMatch = data.gemini && data.gemini.possibleLandmark && data.gemini.possibleLandmark !== 'Unknown' && data.gemini.confidence >= 50;
+
+            console.log('[SCANNER] Match check - YOLO: ' + hasYoloMatch + ', AutoConfirmed: ' + hasAutoConfirmed + ', Gemini(>=50%): ' + hasGeminiMatch);
+
+            if (hasYoloMatch || hasAutoConfirmed || hasGeminiMatch) {
+                const landmarkName = hasYoloMatch ? data.detections[0].class
+                    : (hasAutoConfirmed && data.detections && data.detections.length > 0) ? data.detections[0].class
+                    : data.gemini.possibleLandmark;
                 
+                console.log('[SCANNER] \uD83C\uDFDB\uFE0F LANDMARK DETECTED: "' + landmarkName + '"');
+
                 // Pause automatic scanning loop on detection
                 stopLiveScannerLoop();
                 
                 const banner = document.getElementById('scanner-detected-banner');
                 if (banner) {
-                    banner.innerHTML = `<span>✨ Identified: <strong>${landmarkName}</strong>!</span>`;
+                    banner.innerHTML = '<span>\uD83C\uDFDB Identified: <strong>' + landmarkName + '</strong>!</span>';
                     banner.style.display = 'flex';
                 }
-                setScannerUIState(`Identified: ${landmarkName}`, false);
+                setScannerUIState('Identified: ' + landmarkName, false);
 
                 // Deliver to existing result processor
                 processDetectResult(data);
@@ -3209,9 +3264,10 @@
                 // Auto-close camera overlay after brief delay to reveal the landmark details & AR buttons
                 setTimeout(() => {
                     closeCamera();
-                    showToast(`✨ Identified ${landmarkName}!`);
+                    showToast('\uD83C\uDFDB Identified ' + landmarkName + '!');
                 }, 1100);
             } else {
+                console.log('[SCANNER] \u2139\uFE0F No confident match in this frame, continuing scan...');
                 setScannerUIState("Scanning for heritage landmarks...", false);
             }
         }
