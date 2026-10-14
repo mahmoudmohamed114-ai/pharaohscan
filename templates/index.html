@@ -433,6 +433,100 @@
         }
         .btn-camera:active { transform: translateY(0); }
 
+        /* ── Live Scanner Reticle & HUD (Milestone 1) ── */
+        .scanner-reticle-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: min(80vw, 340px);
+            height: min(80vw, 340px);
+            border: 2px solid rgba(16, 185, 129, 0.35);
+            border-radius: 20px;
+            pointer-events: none;
+            box-shadow: 0 0 30px rgba(16, 185, 129, 0.15), inset 0 0 25px rgba(16, 185, 129, 0.1);
+            overflow: hidden;
+        }
+        .scanner-corner {
+            position: absolute;
+            width: 24px;
+            height: 24px;
+            border-color: #10b981;
+            border-style: solid;
+        }
+        .scanner-corner-tl { top: -2px; left: -2px; border-width: 4px 0 0 4px; border-top-left-radius: 18px; }
+        .scanner-corner-tr { top: -2px; right: -2px; border-width: 4px 4px 0 0; border-top-right-radius: 18px; }
+        .scanner-corner-bl { bottom: -2px; left: -2px; border-width: 0 0 4px 4px; border-bottom-left-radius: 18px; }
+        .scanner-corner-br { bottom: -2px; right: -2px; border-width: 0 4px 4px 0; border-bottom-right-radius: 18px; }
+        .scanner-laser-line {
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, #34d399, #06b6d4, transparent);
+            box-shadow: 0 0 12px #34d399;
+            animation: scanner-sweep 2.4s ease-in-out infinite;
+        }
+        @keyframes scanner-sweep {
+            0% { top: 5%; opacity: 0.3; }
+            50% { top: 92%; opacity: 1; }
+            100% { top: 5%; opacity: 0.3; }
+        }
+        .scanner-status-pill {
+            position: absolute;
+            top: 24px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(15, 23, 42, 0.85);
+            border: 1px solid rgba(16, 185, 129, 0.5);
+            color: #f0fdf4;
+            padding: 8px 18px;
+            border-radius: 24px;
+            font-size: 0.82rem;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            backdrop-filter: blur(10px);
+            z-index: 10;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.4);
+            white-space: nowrap;
+        }
+        .scanner-pulse-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #10b981;
+            box-shadow: 0 0 8px #10b981;
+            animation: scanner-pulse 1.4s infinite;
+        }
+        @keyframes scanner-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.3; transform: scale(0.85); }
+        }
+        .scanner-pulse-dot.busy {
+            background: #06b6d4;
+            box-shadow: 0 0 8px #06b6d4;
+        }
+        .scanner-detected-banner {
+            position: absolute;
+            bottom: 100px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(16, 185, 129, 0.95);
+            color: #fff;
+            padding: 10px 22px;
+            border-radius: 30px;
+            font-weight: 700;
+            font-size: 0.92rem;
+            display: none;
+            align-items: center;
+            gap: 8px;
+            box-shadow: 0 6px 24px rgba(16, 185, 129, 0.5);
+            z-index: 12;
+            animation: pulse 1.5s infinite;
+        }
+        
         /* ── Camera Overlay ── */
         #camera-overlay {
             display: none;
@@ -1748,7 +1842,7 @@
 
                 <!-- ── Camera Button (shown on all devices with camera support) ── -->
                 <button class="btn-camera" id="btn-camera" style="display:flex;">
-                    📸 Take Photo with Camera
+                    🔍 Open Live AI Scanner
                 </button>
                 <button class="btn-enter-ar" id="btn-quick-ar" type="button" style="display:flex;">
                     🥽 Launch Live AR Experience
@@ -2858,20 +2952,41 @@
         }
 
         // Inject camera overlay HTML dynamically (keeps the template clean)
+        // Inject Live AI Scanner overlay HTML dynamically (Milestone 1)
         const cameraOverlayHTML = `
             <div id="camera-overlay">
-                <span class="camera-hint">Point at the landmark &amp; press the button</span>
+                <div class="scanner-status-pill" id="scanner-status-pill">
+                    <div class="scanner-pulse-dot" id="scanner-pulse-dot"></div>
+                    <span id="scanner-status-text">Scanning for heritage landmarks...</span>
+                </div>
+                
                 <video id="camera-video" autoplay playsinline muted></video>
                 <canvas id="canvas-snap"></canvas>
+
+                <div class="scanner-reticle-box" id="scanner-reticle-box">
+                    <div class="scanner-corner scanner-corner-tl"></div>
+                    <div class="scanner-corner scanner-corner-tr"></div>
+                    <div class="scanner-corner scanner-corner-bl"></div>
+                    <div class="scanner-corner scanner-corner-br"></div>
+                    <div class="scanner-laser-line"></div>
+                </div>
+
+                <div class="scanner-detected-banner" id="scanner-detected-banner">
+                    <span>✨ Landmark Identified! Loading details...</span>
+                </div>
+
                 <div class="camera-controls">
-                    <button class="btn-cancel-camera" id="btn-cancel-camera">✕ Cancel</button>
-                    <button class="btn-snap" id="btn-snap" title="Take Photo"></button>
+                    <button class="btn-cancel-camera" id="btn-cancel-camera">✕ Close Scanner</button>
+                    <button class="btn-snap" id="btn-snap" title="Take Still Photo"></button>
                     <div style="width:80px"></div>
                 </div>
             </div>`;
         document.body.insertAdjacentHTML('beforeend', cameraOverlayHTML);
 
         let _cameraStream = null;
+        let _scannerTimer = null;
+        let _isScanJobPending = false;
+        let _scannerActive = false;
 
         async function openCamera() {
             // Request iOS 13+ sensor permissions on camera tap user gesture
@@ -2886,20 +3001,28 @@
             const video = document.getElementById('camera-video');
             try {
                 _cameraStream = await navigator.mediaDevices.getUserMedia({
-                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1920 }, height: { ideal: 1080 } },
+                    video: { facingMode: { ideal: 'environment' }, width: { ideal: 1280 }, height: { ideal: 720 } },
                     audio: false
                 });
                 video.srcObject = _cameraStream;
                 overlay.classList.add('active');
+
+                // Start Live Automatic AI Scanner once video begins playing
+                video.onloadedmetadata = () => {
+                    video.play().then(() => {
+                        startLiveScannerLoop();
+                    }).catch(e => console.warn("Video play error:", e));
+                };
             } catch (err) {
-                let msg = '📷 Camera access denied.';
-                if (err.name === 'NotFoundError') msg = '📷 No camera found on this device.';
-                else if (err.name === 'NotAllowedError') msg = '📷 Camera permission denied. Please allow camera access in your browser settings.';
+                let msg = '⚠️ Camera access denied.';
+                if (err.name === 'NotFoundError') msg = '⚠️ No camera found on this device.';
+                else if (err.name === 'NotAllowedError') msg = '⚠️ Camera permission denied. Please allow camera access in your browser settings.';
                 showToast(msg);
             }
         }
 
         function closeCamera() {
+            stopLiveScannerLoop();
             const overlay = document.getElementById('camera-overlay');
             const video = document.getElementById('camera-video');
             overlay.classList.remove('active');
@@ -2909,6 +3032,190 @@
             }
             video.srcObject = null;
         }
+
+        // ── Milestone 1: Live Camera Automatic AI Recognition Engine ──
+        function startLiveScannerLoop() {
+            if (_scannerActive) return;
+            _scannerActive = true;
+            _isScanJobPending = false;
+
+            setScannerUIState("Scanning for heritage landmarks...", false);
+            const banner = document.getElementById('scanner-detected-banner');
+            if (banner) banner.style.display = 'none';
+
+            // Controlled loop interval: 1800ms
+            _scannerTimer = setInterval(dispatchScannerFrame, 1800);
+        }
+
+        function stopLiveScannerLoop() {
+            _scannerActive = false;
+            _isScanJobPending = false;
+            if (_scannerTimer) {
+                clearInterval(_scannerTimer);
+                _scannerTimer = null;
+            }
+        }
+
+        function setScannerUIState(text, isBusy) {
+            const statusText = document.getElementById('scanner-status-text');
+            const dot = document.getElementById('scanner-pulse-dot');
+            if (statusText) statusText.innerText = text;
+            if (dot) {
+                if (isBusy) dot.classList.add('busy');
+                else dot.classList.remove('busy');
+            }
+        }
+
+        async function dispatchScannerFrame() {
+            if (!_scannerActive || _isScanJobPending) return;
+
+            const video = document.getElementById('camera-video');
+            if (!video || video.readyState < 2 || !video.videoWidth || !video.videoHeight) {
+                return;
+            }
+
+            // Downscale frame to max 640px dimension for high performance & low payload
+            const maxDim = 640;
+            let w = video.videoWidth;
+            let h = video.videoHeight;
+            if (w > maxDim || h > maxDim) {
+                if (w > h) {
+                    h = Math.round((h * maxDim) / w);
+                    w = maxDim;
+                } else {
+                    w = Math.round((w * maxDim) / h);
+                    h = maxDim;
+                }
+            }
+
+            const canvas = document.createElement('canvas');
+            canvas.width = w;
+            canvas.height = h;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, w, h);
+
+            // Compress to JPEG blob at 0.78 quality (~35-50KB)
+            canvas.toBlob(async (blob) => {
+                if (!blob || !_scannerActive || _isScanJobPending) return;
+                _isScanJobPending = true;
+                setScannerUIState("Analyzing with AI...", true);
+
+                const formData = new FormData();
+                formData.append('image', blob, 'live_frame.jpg');
+                formData.append('model_type', 'v11');
+                formData.append('model', 'v11');
+                formData.append('lat', typeof currentLat !== 'undefined' ? currentLat : '29.9792');
+                formData.append('lng', typeof currentLng !== 'undefined' ? currentLng : '31.1342');
+
+                // Attach sensor orientation if available
+                if (typeof getLiveSensors === 'function') {
+                    const sensors = getLiveSensors();
+                    formData.append('gyro_alpha', sensors.alpha || 0);
+                    formData.append('gyro_beta', sensors.beta || 0);
+                    formData.append('gyro_gamma', sensors.gamma || 0);
+                }
+
+                try {
+                    const res = await fetch('/api/detect', {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (!res.ok) {
+                        _isScanJobPending = false;
+                        setScannerUIState("Scanning for heritage landmarks...", false);
+                        return;
+                    }
+
+                    const jobData = await res.json();
+                    if (!jobData.job_id) {
+                        handleScannerResult(jobData);
+                        return;
+                    }
+
+                    // Poll the job endpoint safely with max 8 retries (~4.8s max)
+                    pollScannerJob(jobData.job_id);
+
+                } catch (netErr) {
+                    _isScanJobPending = false;
+                    setScannerUIState("Scanning for heritage landmarks...", false);
+                }
+            }, 'image/jpeg', 0.78);
+        }
+
+        function pollScannerJob(jobId) {
+            let attempts = 0;
+            const maxAttempts = 8;
+            const pollTimer = setInterval(async () => {
+                if (!_scannerActive) {
+                    clearInterval(pollTimer);
+                    _isScanJobPending = false;
+                    return;
+                }
+
+                attempts++;
+                try {
+                    const res = await fetch(`/api/detect/result/${jobId}`);
+                    if (res.status === 404 || attempts >= maxAttempts) {
+                        clearInterval(pollTimer);
+                        _isScanJobPending = false;
+                        setScannerUIState("Scanning for heritage landmarks...", false);
+                        return;
+                    }
+
+                    const data = await res.json();
+                    if (data.status === 'pending') {
+                        return; // Keep waiting
+                    }
+
+                    clearInterval(pollTimer);
+                    _isScanJobPending = false;
+                    handleScannerResult(data);
+
+                } catch (e) {
+                    clearInterval(pollTimer);
+                    _isScanJobPending = false;
+                    setScannerUIState("Scanning for heritage landmarks...", false);
+                }
+            }, 600);
+        }
+
+        function handleScannerResult(data) {
+            if (!data || data.error) {
+                setScannerUIState("Scanning for heritage landmarks...", false);
+                return;
+            }
+
+            // Check if a landmark was recognized with sufficient confidence
+            const hasYoloMatch = data.detections && data.detections.length > 0 && !data.unknown;
+            const hasGeminiMatch = data.gemini && data.gemini.possibleLandmark && data.gemini.possibleLandmark !== 'Unknown' && (data.gemini.confidence >= 65 || data.auto_confirmed);
+
+            if (hasYoloMatch || hasGeminiMatch) {
+                const landmarkName = hasYoloMatch ? data.detections[0].class : data.gemini.possibleLandmark;
+                
+                // Pause automatic scanning loop on detection
+                stopLiveScannerLoop();
+                
+                const banner = document.getElementById('scanner-detected-banner');
+                if (banner) {
+                    banner.innerHTML = `<span>✨ Identified: <strong>${landmarkName}</strong>!</span>`;
+                    banner.style.display = 'flex';
+                }
+                setScannerUIState(`Identified: ${landmarkName}`, false);
+
+                // Deliver to existing result processor
+                processDetectResult(data);
+
+                // Auto-close camera overlay after brief delay to reveal the landmark details & AR buttons
+                setTimeout(() => {
+                    closeCamera();
+                    showToast(`✨ Identified ${landmarkName}!`);
+                }, 1100);
+            } else {
+                setScannerUIState("Scanning for heritage landmarks...", false);
+            }
+        }
+
 
         function snapPhoto() {
             const video = document.getElementById('camera-video');
