@@ -2359,9 +2359,8 @@ def api_health():
     return jsonify({
         'status': 'ok',
         'models_loaded': {
-            'yolov8': _yolo_v8 is not None,
-            'yolo11': _yolo_y11 is not None,
-            'yolo_world': yolo_world_model is not None
+            'yolov8': _yolo_y11 is not None,
+            'yolo11': _yolo_y11 is not None
         }
     })
 
