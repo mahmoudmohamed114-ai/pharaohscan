@@ -372,3 +372,37 @@ Given the current Web stack, there are three primary paths for AR implementation
 2. **AR Overlay:** Click the **"Enter AR Mode"** button. Point the camera around to see the orientation-stabilized badge adjust to device tilt and yaw.
 3. **Museum Artifact Mode:** Click the top navigation tab **"Museum Artifacts and Jewelry"**. Upload `test_museum_jewelry.jpg` (or click "Load Showcase Sample"). Verify that FastSAM segments each individual necklace/pendant, produces transparent crops, and renders separate cards for each item.
 4. **GPS Geofencing:** Click **"Egyptian Museum"** in the GPS Simulator panel to observe real-time proximity alerts and filter community posts by location.
+
+
+---
+
+## 9. Milestone 3 — Artifact Recognition Confirmation Dialog (Completed)
+
+### 9.1 Overview & Architecture
+Prompt 3 introduces a user-centric verification step immediately after the automatic live-camera recognition pipeline identifies a heritage artifact:
+1. **Detection Interception:**
+   - Instead of immediately closing the camera stream upon AI detection, `handleScannerResult(data)` pauses the automatic scanning loop (`stopLiveScannerLoop()`).
+   - The scanner status displays: `Identified: [Artifact Name] — Awaiting confirmation`.
+2. **Confirmation Modal UI (`#artifact-confirm-modal`):**
+   - Clean, mobile-first dark glassmorphic dialog positioned with `z-index: 10050` directly over the active camera viewfinder.
+   - Shows:
+     - **Title:** `Is this the correct artifact?`
+     - **Message:** `We identified this artifact as:`
+     - **Artifact Name:** Extracted from detection payload (`YOLO`, `auto_confirmed`, or `Gemini`).
+     - **Confidence Score:** Formatted percentage (`94%`, `98%`, etc.).
+     - **Buttons:** `✓ Yes, Continue` (emerald glow) and `✕ No, Try Again` (subtle ghost button).
+3. **If User Clicks "Yes, Continue":**
+   - Confirms the detected artifact as the current active artifact (`window.selectedArtifact = { name, id, data, location, confirmedAt }`).
+   - Syncs global context variables (`currentObjectName`, `currentObjectId`).
+   - Closes confirmation modal and camera stream (`closeCamera()`).
+   - Delivers confirmed payload to `processDetectResult(data)` for rendering annotated masks and social posts.
+   - Shows an AR experience transition placeholder card (`#ar-milestone-placeholder`) preparing for Prompt 4.
+4. **If User Clicks "No, Try Again":**
+   - Closes confirmation modal.
+   - Clears rejected artifact from selection (`window.selectedArtifact = null`, `_pendingArtifactData = null`).
+   - Resumes live camera scanning loop (`startLiveScannerLoop()`) seamlessly without reopening the camera.
+   - Does NOT persist the rejected artifact or dirty the database.
+5. **Debouncing & Safety Guards:**
+   - `_isConfirmationModalOpen` flag guarantees only one modal is active per detection event.
+   - Buttons are immediately disabled upon tap (`disabled = true`) to prevent double-tap race conditions.
+   - If camera is closed (`btn-cancel-camera`), `closeCamera()` automatically dismisses the dialog and releases camera streams.
