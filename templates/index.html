@@ -2841,7 +2841,15 @@
         const btnQuickAR = document.getElementById('btn-quick-ar');
         if (btnQuickAR) {
             btnQuickAR.addEventListener('click', () => {
-                ARSession.load('Giza Heritage Explorer', 'Live AR Ready', 'Direct AR Mode');
+                if (window.lastDetectedArtifact && window.lastDetectedArtifact.name) {
+                    ARSession.load(
+                        window.lastDetectedArtifact.name,
+                        window.lastDetectedArtifact.confidence,
+                        window.lastDetectedArtifact.method
+                    );
+                } else {
+                    ARSession.load('Giza Heritage Explorer', 'Ready', 'Direct Sensor Mode');
+                }
                 ARSession.start();
             });
         }
@@ -3854,17 +3862,25 @@
             }
             if (!artifactName) return;
 
-            // Preload artifact into AR badge
+            // Cache globally so any AR button knows the latest detected artifact
+            window.lastDetectedArtifact = { name: artifactName, confidence: confidence, method: method };
             ARSession.load(artifactName, confidence, method);
 
-            // Inject the "Enter AR" button into the result card (once only)
+            // Inject or update the 'Enter AR' button into the result card
             const knownBox = document.getElementById('known-result-box');
-            if (knownBox && !knownBox.querySelector('.btn-enter-ar')) {
-                const btn = document.createElement('button');
-                btn.className = 'btn-enter-ar';
-                btn.innerHTML = '🔭 Enter AR View';
-                btn.onclick = () => ARSession.start();
-                knownBox.appendChild(btn);
+            if (knownBox) {
+                let btn = knownBox.querySelector('.btn-enter-ar');
+                if (!btn) {
+                    btn = document.createElement('button');
+                    btn.className = 'btn-enter-ar';
+                    knownBox.appendChild(btn);
+                }
+                btn.innerHTML = '🥽 View ' + artifactName + ' in AR';
+                btn.onclick = () => {
+                    ARSession.load(artifactName, confidence, method);
+                    ARSession.start();
+                };
+            }
             }
         }
 
