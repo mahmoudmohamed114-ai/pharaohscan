@@ -1,0 +1,9 @@
+{
+  "schemaVersion": 1,
+  "artifacts": [
+    {"objectId":"O001","className":"Khafre-Pyramid","aliases":["Khafre Pyramid"],"label":"Khafre Pyramid","modelUrl":null,"tracking":{"image":null,"object":null}},
+    {"objectId":"O002","className":"Mask-of-Tutankhamun","aliases":["Mask of Tutankhamun","Tutankhamun's mask"],"label":"Mask of Tutankhamun","modelUrl":null,"tracking":{"image":null,"object":null}},
+    {"objectId":"O003","className":"Sphinx","aliases":["The Great Sphinx","Great Sphinx of Giza"],"label":"Great Sphinx","modelUrl":null,"tracking":{"image":null,"object":null}},
+    {"objectId":"O004","className":"Great-Pyramid","aliases":["Great Pyramid","Great Pyramid of Giza"],"label":"Great Pyramid","modelUrl":null,"tracking":{"image":null,"object":null}}
+  ]
+}

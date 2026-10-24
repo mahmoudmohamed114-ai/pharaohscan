@@ -29,7 +29,19 @@ import yaml
 import datetime
 import urllib.request
 
-app = Flask(__name__, static_folder="uploads", static_url_path="/uploads")
+app = Flask(__name__)
+app.config["UPLOAD_FOLDER"] = os.path.join(os.path.dirname(__file__), "uploads")
+
+# Serve uploads explicitly
+from flask import send_from_directory
+@app.route("/uploads/<path:filename>")
+def uploaded_file(filename):
+    return send_from_directory(os.path.join(os.path.dirname(__file__), "uploads"), filename)
+
+# Serve static assets (Three.js, models, etc.)
+@app.route("/static/<path:filename>")
+def serve_static(filename):
+    return send_from_directory(os.path.join(os.path.dirname(__file__), "static"), filename)
 async_mode = "eventlet" if "eventlet" in sys.modules else None
 socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
 
