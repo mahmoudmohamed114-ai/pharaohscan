@@ -2296,26 +2296,9 @@
                     <input type="file" id="file-input" accept="image/*" style="display: none;">
                 </div>
 
-                <!-- ── Action Buttons: Live Camera & Showcase Sample ── -->
-                <div style="display: flex; gap: 8px; margin-top: 12px; flex-wrap: wrap;">
-                    <button class="btn-camera" id="btn-camera" style="flex: 1; min-width: 150px; margin: 0; display: flex; align-items: center; justify-content: center; gap: 6px;">
-                        🔍 Open Live AI Scanner
-                    </button>
-                    <button id="btn-load-sample-jewelry" type="button"
-                        style="flex: 1; min-width: 150px; background: rgba(l2 168, 85, 247, 0.15); border: 1px solid rgba(168, 85, 247, 0.4); color: #c084fc; font-weight: 700; font-size: 0.86rem; padding: 12px 14px; border-radius: 10px; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; gap: 6px; transition: all 0.2s;">
-                        <span>✨ Load Showcase Sample</span>
-                    </button>
-                </div>
-
-                <div style="display: flex; align-items: center; gap: 8px; margin-top: 10px;">
-                    <label for="ar-target-mode" style="font-size: 0.82rem; color: var(--text-muted); white-space: nowrap;">AR target</label>
-                    <select id="ar-target-mode" aria-label="AR target type" style="flex: 1; padding: 8px 10px; background: rgba(0,0,0,0.4); border: 1px solid rgba(255,255,255,0.15); border-radius: 8px; color: #fff; font-size: 0.85rem;">
-                        <option value="object" selected>Real artifact</option>
-                        <option value="image">Photo on screen / board</option>
-                    </select>
-                </div>
-                <button class="btn-enter-ar" id="btn-quick-ar" type="button" style="display:flex; margin-top: 8px;">
-                    🥽 Launch Live AR Experience
+                <!-- ── Live Camera Scanner Option ── -->
+                <button class="btn-camera" id="btn-camera" style="width: 100%; margin-top: 12px; display: flex; align-items: center; justify-content: center; gap: 8px; font-weight: 700; font-size: 0.95rem;">
+                    📷 Open Live Camera Scanner
                 </button>
 
                 <!-- Smart AI Auto-Routing Mode Status Pill (Zero User Selection Required) -->
@@ -3307,21 +3290,6 @@
 
         // ── Camera Capture (Supported on All Devices: Mobile & Desktop Webcams) ──
         const btnCamera = document.getElementById('btn-camera');
-        const btnQuickAR = document.getElementById('btn-quick-ar');
-        if (btnQuickAR) {
-            btnQuickAR.addEventListener('click', () => {
-                if (window.lastDetectedArtifact && window.lastDetectedArtifact.name) {
-                    ARSession.load(
-                        window.lastDetectedArtifact.name,
-                        window.lastDetectedArtifact.confidence,
-                        window.lastDetectedArtifact.method
-                    );
-                } else {
-                    ARSession.load('Giza Heritage Explorer', 'Ready', 'Direct Sensor Mode');
-                }
-                ARSession.start();
-            });
-        }
         if (btnCamera) {
             btnCamera.style.display = 'flex';
         }
@@ -3987,14 +3955,68 @@
         }
         window.updateScanModeIndicator = updateScanModeIndicator;
 
+        function compressImageForUpload(file, maxDim = 1024) {
+            return new Promise((resolve) => {
+                if (!file || !file.type || !file.type.startsWith('image/')) {
+                    return resolve(file);
+                }
+                const img = new Image();
+                const reader = new FileReader();
+                reader.onload = (e) => {
+                    img.onload = () => {
+                        let { width, height } = img;
+                        if (width <= maxDim && height <= maxDim && file.size < 600 * 1024) {
+                            return resolve(file);
+                        }
+                        if (width > height) {
+                            if (width > maxDim) {
+                                height = Math.round((height * maxDim) / width);
+                                width = maxDim;
+                            }
+                        } else {
+                            if (height > maxDim) {
+                                width = Math.round((width * maxDim) / height);
+                                width = maxDim;
+                            }
+                        }
+                        const canvas = document.createElement('canvas');
+                        canvas.width = width;
+                        canvas.height = height;
+                        const ctx = canvas.getContext('2d');
+                        ctx.drawImage(img, 0, 0, width, height);
+                        canvas.toBlob((blob) => {
+                            if (blob) {
+                                resolve(new File([blob], file.name.replace(/\.[^.]+$/, '.jpg'), { type: 'image/jpeg' }));
+                            } else {
+                                resolve(file);
+                            }
+                        }, 'image/jpeg', 0.85);
+                    };
+                    img.onerror = () => resolve(file);
+                    img.src = e.target.result;
+                };
+                reader.onerror = () => resolve(file);
+                reader.readAsDataURL(file);
+            });
+        }
+
         btnDetect.addEventListener('click', async () => {
             if (!selectedFile) return;
 
             btnDetect.disabled = true;
+            btnDetect.innerHTML = `🔍 Preparing Image...`;
+
+            let fileToSend = selectedFile;
+            try {
+                fileToSend = await compressImageForUpload(selectedFile, 1024);
+            } catch (prepErr) {
+                console.warn('Image prep warning:', prepErr);
+            }
+
             btnDetect.innerHTML = `🔍 Uploading Image...`;
 
             const formData = new FormData();
-            formData.append('image', selectedFile);
+            formData.append('image', fileToSend);
             formData.append('model', 'yolov8');
             formData.append('lat', currentLat);
             formData.append('lng', currentLng);
@@ -4928,53 +4950,6 @@
         // ════════════════════════════════════════════════════════════════
         (function initArtifactPipelineUI() {
             const container = document.getElementById('artifact-segmentation-container');
-            const btnLoadSample = document.getElementById('btn-load-sample-jewelry');
-
-            const statusBanner = document.getElementById('artifact-processing-status');
-            const statusTitle = document.getElementById('artifact-status-title');
-            const statusDesc = document.getElementById('artifact-status-desc');
-
-            const resultsWrapper = document.getElementById('artifact-results-wrapper');
-            const kpiCount = document.getElementById('kpi-item-count');
-            const kpiAvgConf = document.getElementById('kpi-avg-conf');
-
-            const imgDetection = document.getElementById('img-output-detection');
-            const imgSegmentation = document.getElementById('img-output-segmentation');
-            const btnDlDetection = document.getElementById('btn-dl-detection');
-            const btnDlSegmentation = document.getElementById('btn-dl-segmentation');
-
-            const galleryContainer = document.getElementById('extracted-gallery-container');
-            const jsonDisplay = document.getElementById('results-json-display');
-            const btnCopyJson = document.getElementById('btn-copy-json');
-
-            // Showcase Sample Loader for unified single scanner
-            if (btnLoadSample) {
-                btnLoadSample.addEventListener('click', async () => {
-                    try {
-                        btnLoadSample.disabled = true;
-                        btnLoadSample.innerHTML = '<span>⏳ Loading Sample...</span>';
-                        const res = await fetch('/api/artifacts/sample');
-                        if (!res.ok) throw new Error('Sample not found');
-                        const blob = await res.blob();
-                        const sampleFile = new File([blob], 'test_museum_jewelry.jpg', { type: 'image/jpeg' });
-                        if (typeof handleFile === 'function') {
-                            handleFile(sampleFile);
-                        }
-                        if (typeof window.updateScanModeIndicator === 'function') {
-                            window.updateScanModeIndicator('indoor', '💎 Museum Jewelry Sample Loaded');
-                        }
-                        const detectBtn = document.getElementById('btn-detect');
-                        if (detectBtn) detectBtn.disabled = false;
-                        showToast('📥 Loaded Museum Showcase Sample Photo!');
-                    } catch (err) {
-                        console.error('Failed to load sample:', err);
-                        showToast('❌ Failed to load showcase sample.');
-                    } finally {
-                        btnLoadSample.disabled = false;
-                        btnLoadSample.innerHTML = '<span>✨ Load Showcase Sample</span>';
-                    }
-                });
-            }
 
             // Client-side image resizing helper (prevents cloud server 502/OOM from 12MP phone photos)
             function compressImageIfNeeded(file, maxDim = 1280) {

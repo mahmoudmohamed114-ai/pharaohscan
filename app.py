@@ -999,6 +999,13 @@ def api_segment_artifacts():
     if img is None:
         return jsonify({'error': 'Invalid image format'}), 400
 
+    # Ensure max dimension <= 1024 to prevent memory exhaustion
+    h_orig, w_orig = img.shape[:2]
+    max_dim = 1024
+    if max(h_orig, w_orig) > max_dim:
+        scale = max_dim / float(max(h_orig, w_orig))
+        img = cv2.resize(img, (int(round(w_orig * scale)), int(round(h_orig * scale))), interpolation=cv2.INTER_AREA)
+
     try:
         try:
             import eventlet
@@ -1398,11 +1405,20 @@ def api_detect():
     mimetype   = file.mimetype
     file_bytes = file.read()
 
-    # Quick image validation before dispatching
+    # Quick image validation and memory-safe downscaling
     nparr = np.frombuffer(file_bytes, np.uint8)
     img   = cv2.imdecode(nparr, cv2.IMREAD_COLOR)
     if img is None:
         return jsonify({'error': 'Invalid image format'}), 400
+
+    # Ensure max dimension <= 1024 to prevent Railway 512MB RAM OOM / SIGKILL
+    h_orig, w_orig = img.shape[:2]
+    max_dim = 1024
+    if max(h_orig, w_orig) > max_dim:
+        scale = max_dim / float(max(h_orig, w_orig))
+        img = cv2.resize(img, (int(round(w_orig * scale)), int(round(h_orig * scale))), interpolation=cv2.INTER_AREA)
+        _, buf = cv2.imencode('.jpg', img, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
+        file_bytes = buf.tobytes()
 
     # Create job entry and launch background thread
     job_id = str(uuid.uuid4())
@@ -1550,15 +1566,12 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
     """Heavy detection logic — runs in background thread, returns a plain dict result."""
     is_custom_active = is_custom_yolo11 if model_type == 'v11' else is_custom_yolov8
     is_demo_active   = is_yolo11_demo   if model_type == 'v11' else False
-    active_model     = get_yolo_y11()   if model_type == 'v11' else get_yolo_v8()
     threshold = 0.60
 
     try:
-
-            
         t0 = time.time()
         
-        # 1. Check local duplicates
+        # 1. Check local duplicates (instant, zero RAM)
         img_hash = compute_hash(file_bytes)
         dup_found, dup_class = is_duplicate(img_hash)
         
@@ -1616,7 +1629,75 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                     'object': serialize_mongo(matched_obj) if matched_obj else None,
                     'posts': serialize_mongo(posts)
                 }
-                
+
+        # 2. Query Gemini Vision (Runs in Google Cloud, takes 0MB Server RAM)
+        try:
+            lat_context = float(lat_form)
+            lng_context = float(lng_form)
+        except:
+            lat_context = 29.9792
+            lng_context = 31.1342
+        geohashes = get_geohash_neighbors(lat_context, lng_context, 6)
+        nearby_locs = list(db.locations.find({"geohash": {"$in": geohashes}}))
+        nearby_objs = []
+        for loc in nearby_locs:
+            objs = list(db.objects.find({"location_id": loc["location_id"]}))
+            for o in objs:
+                nearby_objs.append(f"{o['name']} (at {loc['name']})")
+        nearby_landmarks_str = "\n".join([f"  - {o}" for o in nearby_objs])
+
+        try:
+            gemini_res = analyze_with_gemini(file_bytes, mimetype, nearby_landmarks_str)
+        except Exception as g_err:
+            print(f"[WARNING] Gemini vision API error: {g_err}")
+            gemini_res = {"possibleLandmark": "Unknown", "description": "", "sceneType": "outdoor", "isArtifact": False}
+
+        # ── Smart Pipeline Auto-Router Branch A: Indoor Museum Artifact ─────────────────
+        if is_indoor_artifact(gemini_res, filename):
+            print(f"[AUTO-ROUTER] 💎 Gemini classified '{filename}' as an Indoor Museum Artifact / Jewelry piece! Executing FastSAM segmentation pipeline...")
+            try:
+                pipeline = get_artifact_pipeline()
+                output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "outputs"))
+                seg_res = pipeline.process_image(img, output_dir=output_dir)
+
+                with open(seg_res["detection_path"], "rb") as f:
+                    det_b64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode('utf-8')
+
+                with open(seg_res["segmentation_path"], "rb") as f:
+                    seg_b64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode('utf-8')
+
+                items_enhanced = []
+                for item in seg_res["results"]["items"]:
+                    obj_path = os.path.join(output_dir, item["segmented_image"])
+                    item_data = dict(item)
+                    item_data["url"] = f"/outputs/{item['segmented_image']}"
+                    if os.path.exists(obj_path):
+                        with open(obj_path, "rb") as of:
+                            item_data["image_base64"] = "data:image/png;base64," + base64.b64encode(of.read()).decode('utf-8')
+                    items_enhanced.append(item_data)
+
+                landmark_label = gemini_res.get("possibleLandmark")
+                label_txt = f" ({landmark_label})" if landmark_label and landmark_label != "Unknown" else ""
+
+                return {
+                    'pipeline': 'artifact_segmentation',
+                    'scene_type': 'indoor',
+                    'success': True,
+                    'detection_image': det_b64,
+                    'segmentation_image': seg_b64,
+                    'items': items_enhanced,
+                    'results_json': seg_res["results"],
+                    'num_items': len(items_enhanced),
+                    'gemini': gemini_res,
+                    'router_msg': f"💎 AI Auto-Detected: Indoor Museum Artifact{label_txt} → FastSAM Segmentation Pipeline Executed"
+                }
+            except Exception as seg_err:
+                print(f"[WARNING] Auto-routed artifact pipeline failed: {seg_err}, falling back to landmark pipeline")
+            finally:
+                gc.collect()
+
+        # ── Smart Pipeline Auto-Router Branch B: Outdoor Heritage Landmark ──────────────
+        # Only now load YOLO model into RAM (FastSAM is never loaded, saving 250MB+ RAM!)
         BACKGROUND_NOISE_CLASSES = {
             'car', 'truck', 'bus', 'person', 'bicycle', 'motorcycle', 'traffic light', 
             'stop sign', 'bench', 'parking meter', 'dog', 'cat', 'airplane', 'train', 
@@ -1624,7 +1705,7 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
             'potted plant', 'bed', 'dining table', 'tv', 'laptop', 'cell phone'
         }
 
-        # 2. Run standard model prediction
+        active_model = get_yolo_y11() if model_type == 'v11' else get_yolo_v8()
         results = active_model.predict(source=img, save=False, verbose=False)
         inference_time = (time.time() - t0) * 1000
         result = results[0]
@@ -1854,71 +1935,7 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                 print(f"[WARNING] Custom classes YOLO-World detection failed: {e}")
 
         # 4. Unknown landmark fallback — zero-shot pipeline
-        print(f"[INFO] Running Zero-Shot Fallback Pipeline for: {filename}")
-        
-        # Read user active GPS coordinate from request
-        try:
-            lat_context = float(lat_form)
-            lng_context = float(lng_form)
-        except:
-            lat_context = 29.9792
-            lng_context = 31.1342
-        geohashes = get_geohash_neighbors(lat_context, lng_context, 6)
-        nearby_locs = list(db.locations.find({"geohash": {"$in": geohashes}}))
-        
-        nearby_objs = []
-        for loc in nearby_locs:
-            objs = list(db.objects.find({"location_id": loc["location_id"]}))
-            for o in objs:
-                nearby_objs.append(f"{o['name']} (at {loc['name']})")
-        nearby_landmarks_str = "\n".join([f"  - {o}" for o in nearby_objs])
-        
-        # Run Gemini
-        gemini_res = analyze_with_gemini(file_bytes, mimetype, nearby_landmarks_str)
-
-        # ── Smart Pipeline Auto-Router (Indoor Museum Artifact vs Outdoor Landmark) ──
-        if is_indoor_artifact(gemini_res, filename):
-            print(f"[AUTO-ROUTER] 💎 Gemini classified '{filename}' as an Indoor Museum Artifact / Jewelry piece! Executing FastSAM segmentation pipeline...")
-            try:
-                pipeline = get_artifact_pipeline()
-                output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "outputs"))
-                seg_res = pipeline.process_image(img, output_dir=output_dir)
-
-                with open(seg_res["detection_path"], "rb") as f:
-                    det_b64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode('utf-8')
-
-                with open(seg_res["segmentation_path"], "rb") as f:
-                    seg_b64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode('utf-8')
-
-                items_enhanced = []
-                for item in seg_res["results"]["items"]:
-                    obj_path = os.path.join(output_dir, item["segmented_image"])
-                    item_data = dict(item)
-                    item_data["url"] = f"/outputs/{item['segmented_image']}"
-                    if os.path.exists(obj_path):
-                        with open(obj_path, "rb") as of:
-                            item_data["image_base64"] = "data:image/png;base64," + base64.b64encode(of.read()).decode('utf-8')
-                    items_enhanced.append(item_data)
-
-                landmark_label = gemini_res.get("possibleLandmark")
-                label_txt = f" ({landmark_label})" if landmark_label and landmark_label != "Unknown" else ""
-
-                return {
-                    'pipeline': 'artifact_segmentation',
-                    'scene_type': 'indoor',
-                    'success': True,
-                    'detection_image': det_b64,
-                    'segmentation_image': seg_b64,
-                    'items': items_enhanced,
-                    'results_json': seg_res["results"],
-                    'num_items': len(items_enhanced),
-                    'gemini': gemini_res,
-                    'router_msg': f"💎 AI Auto-Detected: Indoor Museum Artifact{label_txt} → FastSAM Segmentation Pipeline Executed"
-                }
-            except Exception as seg_err:
-                print(f"[WARNING] Auto-routed artifact pipeline failed: {seg_err}, falling back to landmark pipeline")
-            finally:
-                gc.collect()
+        print(f"[INFO] Using Gemini Zero-Shot Fallback for: {filename}")
 
         suggested_landmark = gemini_res.get("possibleLandmark", "Unknown")
         description = gemini_res.get("description", "")
