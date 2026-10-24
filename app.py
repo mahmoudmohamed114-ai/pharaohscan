@@ -912,9 +912,9 @@ def register_landmark_object(landmark_name, class_name=None, lat=None, lng=None,
         
     return obj_doc
 
-# ─── Async Job Queue (prevents Railway 60s proxy timeout on YOLO inference) ───
+# ─── Async Job Queue with TTL (prevents premature 404 / Job expired errors) ───
 import threading
-_job_store = {}   # job_id -> {"status": "pending"|"done"|"error", "result": {...}}
+_job_store = {}   # job_id -> {"status": "pending"|"done"|"error", "result": {...}, "ts": float}
 _job_lock  = threading.Lock()
 
 def _run_detect_job(job_id, detect_fn, *args, **kwargs):
@@ -922,12 +922,12 @@ def _run_detect_job(job_id, detect_fn, *args, **kwargs):
     try:
         result = detect_fn(*args, **kwargs)
         with _job_lock:
-            _job_store[job_id] = {"status": "done", "result": result}
+            _job_store[job_id] = {"status": "done", "result": result, "ts": time.time()}
     except Exception as e:
         import traceback
         traceback.print_exc()
         with _job_lock:
-            _job_store[job_id] = {"status": "error", "result": {"error": str(e)}}
+            _job_store[job_id] = {"status": "error", "result": {"error": str(e)}, "ts": time.time()}
 
 # ─── API Routes ───────────────────────────────────────────────────────────────
 @app.route('/favicon.ico')
@@ -943,14 +943,18 @@ def index():
 def api_detect_result(job_id):
     """Poll for the result of an async detect job."""
     with _job_lock:
+        # Periodic cleanup of jobs older than 15 minutes
+        now = time.time()
+        expired = [k for k, v in _job_store.items() if (now - v.get("ts", now)) > 900]
+        for k in expired:
+            _job_store.pop(k, None)
+
         job = _job_store.get(job_id)
+
     if job is None:
         return jsonify({"status": "not_found"}), 404
     if job["status"] == "pending":
         return jsonify({"status": "pending"})
-    # Clean up after delivery
-    with _job_lock:
-        _job_store.pop(job_id, None)
     if job["status"] == "error":
         return jsonify(job["result"]), 500
     return jsonify(job["result"])
@@ -1423,7 +1427,7 @@ def api_detect():
     # Create job entry and launch background thread
     job_id = str(uuid.uuid4())
     with _job_lock:
-        _job_store[job_id] = {"status": "pending"}
+        _job_store[job_id] = {"status": "pending", "ts": time.time()}
 
     threading.Thread(
         target=_run_detect_job,

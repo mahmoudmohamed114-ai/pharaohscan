@@ -3322,6 +3322,22 @@
                     <div class="scanner-pulse-dot" id="scanner-pulse-dot"></div>
                     <span id="scanner-status-text">Scanning for heritage landmarks...</span>
                 </div>
+
+                <!-- Live Camera AI Scan Progress Bar Widget -->
+                <div id="live-scanner-progress-bar-wrap" style="position: absolute; top: 76px; left: 50%; transform: translateX(-50%); width: 88%; max-width: 420px; z-index: 100; display: none;">
+                    <div style="background: rgba(15, 23, 42, 0.88); backdrop-filter: blur(12px); border: 1px solid rgba(56, 189, 248, 0.45); border-radius: 12px; padding: 10px 14px; box-shadow: 0 4px 20px rgba(0,0,0,0.6);">
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px;">
+                            <span id="live-scanner-step-txt" style="font-size: 0.78rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+                                <span class="pulse-dot" style="background:#38bdf8; width:7px; height:7px;"></span>
+                                <span>AI Scene Analysis...</span>
+                            </span>
+                            <span id="live-scanner-progress-pct" style="font-size: 0.82rem; font-weight: 800; color: #f8fafc; font-variant-numeric: tabular-nums;">0%</span>
+                        </div>
+                        <div style="width: 100%; height: 6px; background: rgba(255, 255, 255, 0.12); border-radius: 999px; overflow: hidden;">
+                            <div id="live-scanner-progress-fill" style="width: 0%; height: 100%; background: linear-gradient(90deg, #38bdf8, #10b981, #c084fc); border-radius: 999px; transition: width 0.25s ease; box-shadow: 0 0 10px rgba(56,189,248,0.8);"></div>
+                        </div>
+                    </div>
+                </div>
                 
                 <video id="camera-video" autoplay playsinline muted></video>
                 <canvas id="canvas-snap"></canvas>
@@ -3461,21 +3477,41 @@
             }
         }
 
+        function setLiveScannerProgress(pct, text) {
+            const wrap = document.getElementById('live-scanner-progress-bar-wrap');
+            const fill = document.getElementById('live-scanner-progress-fill');
+            const pctEl = document.getElementById('live-scanner-progress-pct');
+            const stepEl = document.getElementById('live-scanner-step-txt');
+
+            if (!wrap) return;
+            wrap.style.display = 'block';
+            if (fill) fill.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+            if (pctEl) pctEl.textContent = `${Math.round(pct)}%`;
+            if (stepEl && text) stepEl.innerHTML = `<span class="pulse-dot" style="background:#38bdf8; width:7px; height:7px;"></span><span>${text}</span>`;
+        }
+
+        function hideLiveScannerProgress(delayMs = 400) {
+            setTimeout(() => {
+                const wrap = document.getElementById('live-scanner-progress-bar-wrap');
+                if (wrap) wrap.style.display = 'none';
+            }, delayMs);
+        }
+
         let _scanJobSafetyTimer = null;
 
         async function dispatchScannerFrame() {
             if (!_scannerActive) { return; }
             if (_isScanJobPending) {
-                console.log('[SCANNER] \u23F3 Skipping frame \u2014 previous job still pending');
+                console.log('[SCANNER] ⏳ Skipping frame — previous job still pending');
                 return;
             }
 
             const video = document.getElementById('camera-video');
-            if (!video) { console.warn('[SCANNER] \u274C No video element found'); return; }
-            if (video.readyState < 2) { console.log('[SCANNER] \u23F3 Video not ready yet (readyState=' + video.readyState + ')'); return; }
-            if (!video.videoWidth || !video.videoHeight) { console.warn('[SCANNER] \u274C Video has no dimensions'); return; }
+            if (!video) { console.warn('[SCANNER] ❌ No video element found'); return; }
+            if (video.readyState < 2) { console.log('[SCANNER] ⏳ Video not ready yet (readyState=' + video.readyState + ')'); return; }
+            if (!video.videoWidth || !video.videoHeight) { console.warn('[SCANNER] ❌ Video has no dimensions'); return; }
 
-            console.log('[SCANNER] \uD83D\uDCF8 Capturing frame: ' + video.videoWidth + 'x' + video.videoHeight);
+            console.log('[SCANNER] 📸 Capturing frame: ' + video.videoWidth + 'x' + video.videoHeight);
 
             // Downscale frame to max 640px dimension for high performance & low payload
             const maxDim = 640;
@@ -3499,20 +3535,22 @@
 
             // Compress to JPEG blob at 0.78 quality (~35-50KB)
             canvas.toBlob(async (blob) => {
-                if (!blob) { console.warn('[SCANNER] \u274C toBlob returned null'); return; }
+                if (!blob) { console.warn('[SCANNER] ❌ toBlob returned null'); return; }
                 if (!_scannerActive) { console.log('[SCANNER] Scanner stopped before blob ready'); return; }
                 if (_isScanJobPending) { console.log('[SCANNER] Job became pending during blob creation'); return; }
 
                 _isScanJobPending = true;
-                console.log('[SCANNER] \uD83D\uDCE4 Sending frame to /api/detect (blob size: ' + (blob.size/1024).toFixed(1) + 'KB)');
+                console.log('[SCANNER] 📤 Sending frame to /api/detect (blob size: ' + (blob.size/1024).toFixed(1) + 'KB)');
                 setScannerUIState("Analyzing with AI...", true);
+                setLiveScannerProgress(30, 'Sending camera frame to AI engine...');
 
                 // Safety timer: if _isScanJobPending is still true after 25s, force-reset it
                 if (_scanJobSafetyTimer) clearTimeout(_scanJobSafetyTimer);
                 _scanJobSafetyTimer = setTimeout(() => {
                     if (_isScanJobPending) {
-                        console.warn('[SCANNER] \u26A0\uFE0F Safety timeout: force-resetting _isScanJobPending after 25s');
+                        console.warn('[SCANNER] ⚠️ Safety timeout: force-resetting _isScanJobPending after 25s');
                         _isScanJobPending = false;
+                        hideLiveScannerProgress(0);
                         setScannerUIState("Scanning for heritage landmarks...", false);
                     }
                 }, 25000);
@@ -3538,31 +3576,35 @@
                         body: formData
                     });
 
-                    console.log('[SCANNER] \uD83D\uDCE5 /api/detect response status: ' + res.status);
+                    console.log('[SCANNER] 📥 /api/detect response status: ' + res.status);
 
                     if (!res.ok) {
-                        console.error('[SCANNER] \u274C /api/detect failed with status ' + res.status);
+                        console.error('[SCANNER] ❌ /api/detect failed with status ' + res.status);
                         _isScanJobPending = false;
+                        hideLiveScannerProgress(0);
                         setScannerUIState("Scanning for heritage landmarks...", false);
                         return;
                     }
 
                     const jobData = await res.json();
-                    console.log('[SCANNER] \uD83D\uDCE5 /api/detect response: ' + JSON.stringify(jobData).substring(0, 200));
+                    console.log('[SCANNER] 📥 /api/detect response: ' + JSON.stringify(jobData).substring(0, 200));
 
                     if (!jobData.job_id) {
-                        console.log('[SCANNER] \u26A1 Immediate result (no job_id), processing...');
+                        console.log('[SCANNER] ⚡ Immediate result (no job_id), processing...');
+                        setLiveScannerProgress(100, '✨ Landmark / Artifact Matched!');
+                        hideLiveScannerProgress(600);
                         handleScannerResult(jobData);
                         return;
                     }
 
-                    console.log('[SCANNER] \uD83D\uDD04 Got job_id: ' + jobData.job_id + ', starting poll...');
-                    // Poll the job endpoint safely with max 20 retries (~16s max for Gemini fallback)
+                    console.log('[SCANNER] 🔄 Got job_id: ' + jobData.job_id + ', starting poll...');
+                    // Poll the job endpoint safely with live progress
                     pollScannerJob(jobData.job_id);
 
                 } catch (netErr) {
-                    console.error('[SCANNER] \u274C Network error: ' + (netErr.message || netErr));
+                    console.error('[SCANNER] ❌ Network error: ' + (netErr.message || netErr));
                     _isScanJobPending = false;
+                    hideLiveScannerProgress(0);
                     setScannerUIState("Scanning for heritage landmarks...", false);
                 }
             }, 'image/jpeg', 0.78);
@@ -3570,24 +3612,43 @@
 
         function pollScannerJob(jobId) {
             let attempts = 0;
-            const maxAttempts = 20;
+            let consecutive404s = 0;
+            const maxAttempts = 22;
             const pollTimer = setInterval(async () => {
                 if (!_scannerActive) {
                     console.log('[SCANNER] Scanner stopped during poll, aborting');
                     clearInterval(pollTimer);
                     _isScanJobPending = false;
+                    hideLiveScannerProgress(0);
                     return;
                 }
 
                 attempts++;
+                const livePct = Math.min(95, 40 + attempts * 7);
+                setLiveScannerProgress(livePct, attempts > 2 ? 'AI Neural Segmentation & Matching...' : 'AI Scene Analysis...');
+
                 try {
                     const res = await fetch('/api/detect/result/' + jobId);
-                    console.log('[SCANNER] \uD83D\uDD04 Poll #' + attempts + '/' + maxAttempts + ' for ' + jobId + ': status ' + res.status);
+                    console.log('[SCANNER] 🔄 Poll #' + attempts + '/' + maxAttempts + ' for ' + jobId + ': status ' + res.status);
 
-                    if (res.status === 404 || attempts >= maxAttempts) {
-                        console.warn('[SCANNER] \u26A0\uFE0F Poll exhausted (attempts=' + attempts + ', status=' + res.status + ')');
+                    if (res.status === 404) {
+                        consecutive404s++;
+                        if (consecutive404s >= 4 || attempts >= maxAttempts) {
+                            console.warn('[SCANNER] ⚠️ Poll exhausted (attempts=' + attempts + ', 404s=' + consecutive404s + ')');
+                            clearInterval(pollTimer);
+                            _isScanJobPending = false;
+                            hideLiveScannerProgress(0);
+                            setScannerUIState("Scanning for heritage landmarks...", false);
+                            return;
+                        }
+                        return; // Keep waiting for next tick
+                    }
+                    consecutive404s = 0;
+
+                    if (attempts >= maxAttempts) {
                         clearInterval(pollTimer);
                         _isScanJobPending = false;
+                        hideLiveScannerProgress(0);
                         setScannerUIState("Scanning for heritage landmarks...", false);
                         return;
                     }
@@ -3597,15 +3658,18 @@
                         return; // Keep waiting
                     }
 
-                    console.log('[SCANNER] \u2705 Poll got result: ' + JSON.stringify(data).substring(0, 300));
+                    console.log('[SCANNER] ✅ Poll got result: ' + JSON.stringify(data).substring(0, 300));
                     clearInterval(pollTimer);
                     _isScanJobPending = false;
+                    setLiveScannerProgress(100, '✨ Heritage Landmark / Artifact Matched!');
+                    hideLiveScannerProgress(600);
                     handleScannerResult(data);
 
                 } catch (e) {
-                    console.error('[SCANNER] \u274C Poll error: ' + (e.message || e));
+                    console.error('[SCANNER] ❌ Poll error: ' + (e.message || e));
                     clearInterval(pollTimer);
                     _isScanJobPending = false;
+                    hideLiveScannerProgress(0);
                     setScannerUIState("Scanning for heritage landmarks...", false);
                 }
             }, 800);
@@ -3915,6 +3979,13 @@
                 closeCamera();
                 const file = new File([blob], `photo_${Date.now()}.jpg`, { type: 'image/jpeg' });
                 handleFile(file);
+                // Automatically start scan with progress bar
+                setTimeout(() => {
+                    const btn = document.getElementById('btn-detect');
+                    if (btn && !btn.disabled) {
+                        btn.click();
+                    }
+                }, 350);
             }, 'image/jpeg', 0.92);
         }
 
@@ -4116,6 +4187,7 @@
                     { pct: 95, title: '⏳ Finalizing Heritage Results...', sub: 'Compiling historic descriptions & database matches' }
                 ];
 
+                let consecutive404s = 0;
                 const pollInterval = setInterval(async () => {
                     const currentStage = stages[Math.min(pollCount, stages.length - 1)];
                     setScanProgress(currentStage.pct, currentStage.title, currentStage.sub);
@@ -4125,13 +4197,19 @@
                     try {
                         const pollRes = await fetch(`/api/detect/result/${jobId}`);
                         if (pollRes.status === 404) {
-                            clearInterval(pollInterval);
-                            showToast('Error: Job expired. Please try again.');
-                            btnDetect.disabled = false;
-                            btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
-                            hideScanProgress(0);
-                            return;
+                            consecutive404s++;
+                            console.warn(`Poll returned 404 (attempt ${consecutive404s}/4)`);
+                            if (consecutive404s >= 4 || pollCount >= 35) {
+                                clearInterval(pollInterval);
+                                showToast('Error: Job expired or server busy. Please try again.');
+                                btnDetect.disabled = false;
+                                btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
+                                hideScanProgress(0);
+                                return;
+                            }
+                            return; // Wait for next tick
                         }
+                        consecutive404s = 0;
                         const pollData = await pollRes.json();
                         if (pollData.status === 'pending') return; // still running
 
