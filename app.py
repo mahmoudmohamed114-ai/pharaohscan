@@ -389,30 +389,34 @@ def analyze_with_gemini(image_bytes, mime_type, nearby_landmarks_str):
         return {
             "description": "Mock description of a classic Egyptian archaeological structure with columns and carvings.",
             "possibleLandmark": "Tomb of Seshemnefer IV",
+            "sceneType": "outdoor",
+            "isArtifact": False,
             "isNewLandmark": True,
             "confidence": 95,
             "reason": "Gemini API key is missing. Using pre-loaded mock descriptor."
         }
         
-    prompt = f"""You are a heritage landmark identification assistant.
+    prompt = f"""You are an expert AI Egyptian heritage, archaeology, and museum identification assistant.
 
 The image was captured near these known heritage landmarks:
 {nearby_landmarks_str}
 
-Analyse the uploaded image carefully and identify any heritage site or landmark visible in it.
-
-Rules:
-1. If the image clearly shows one of the nearby listed landmarks, use that exact name and set "isNewLandmark" to false.
-2. If the image shows a different, identifiable landmark that is NOT in the nearby list, name it and set "isNewLandmark" to true.
-3. If no recognisable landmark is visible, set "possibleLandmark" to "Unknown" and "isNewLandmark" to false.
-4. IMPORTANT: Always include the real-world GPS coordinates of the identified landmark based on your knowledge.
-   - For example: Eiffel Tower → latitude: 48.8584, longitude: 2.2945
-   - If the landmark is unknown or unrecognisable, use null for both.
+Analyse the uploaded image carefully:
+1. Determine if this image shows:
+   - "indoor": An indoor museum artifact, jewelry (necklaces, bracelets, rings, pendants, beads, gold collar), antiquity, mask, statue inside a museum/case, or individual historical items.
+   - "outdoor": An outdoor monument, architectural site, pyramid, temple, outdoor tomb, or landscape landmark.
+2. Identify the specific landmark or artifact visible.
+3. If the image clearly shows one of the nearby listed landmarks, use that exact name and set "isNewLandmark" to false.
+4. If the image shows a different, identifiable landmark or artifact that is NOT in the nearby list, name it and set "isNewLandmark" to true.
+5. If no recognisable landmark or artifact is visible, set "possibleLandmark" to "Unknown" and "isNewLandmark" to false.
+6. Provide GPS coordinates if known (or null).
 
 Return ONLY a valid JSON object — no markdown fences, no extra text:
 {{
   "description": "Detailed visual description of what is shown in the image",
-  "possibleLandmark": "Name of the identified landmark",
+  "possibleLandmark": "Name of the identified landmark or artifact",
+  "sceneType": "indoor",
+  "isArtifact": true,
   "isNewLandmark": false,
   "confidence": 85,
   "reason": "Brief explanation supporting your identification",
@@ -421,6 +425,8 @@ Return ONLY a valid JSON object — no markdown fences, no extra text:
 }}
 
 confidence must be an integer from 0 to 100.
+sceneType must be strictly either "indoor" or "outdoor".
+isArtifact must be true for museum items/jewelry/antiquities, and false for architectural landmarks/monuments.
 latitude and longitude must be real decimal numbers (e.g. 48.8584, 2.2945) or null if unknown."""
 
     b64_data = base64.b64encode(image_bytes).decode('utf-8')
@@ -454,7 +460,7 @@ latitude and longitude must be real decimal numbers (e.g. 48.8584, 2.2945) or nu
                     text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.IGNORECASE)
                     text = re.sub(r'\s*```$', '', text, flags=re.IGNORECASE)
                 parsed = json.loads(text.strip())
-                print(f"[INFO] Gemini Direct REST ({model_name}) succeeded: {parsed.get('possibleLandmark')}")
+                print(f"[INFO] Gemini Direct REST ({model_name}) succeeded: {parsed.get('possibleLandmark')} [sceneType={parsed.get('sceneType')}]")
                 return parsed
         except urllib.error.HTTPError as he:
             try:
@@ -480,7 +486,7 @@ latitude and longitude must be real decimal numbers (e.g. 48.8584, 2.2945) or nu
                 text = re.sub(r'^```(?:json)?\s*', '', text, flags=re.IGNORECASE)
                 text = re.sub(r'\s*```$', '', text, flags=re.IGNORECASE)
             parsed = json.loads(text.strip())
-            print(f"[INFO] Gemini SDK ({sdk_model}) succeeded: {parsed.get('possibleLandmark')}")
+            print(f"[INFO] Gemini SDK ({sdk_model}) succeeded: {parsed.get('possibleLandmark')} [sceneType={parsed.get('sceneType')}]")
             return parsed
         except Exception as e:
             last_error = f"SDK {sdk_model}: {str(e)}"
@@ -490,10 +496,63 @@ latitude and longitude must be real decimal numbers (e.g. 48.8584, 2.2945) or nu
     return {
         "description": "An unidentified subject or landmark with distinct architectural features.",
         "possibleLandmark": "Unknown",
+        "sceneType": "outdoor",
+        "isArtifact": False,
         "isNewLandmark": False,
         "confidence": 0,
         "reason": f"Could not identify landmark while offline. ({last_error})"
     }
+
+def is_indoor_artifact(gemini_res, filename=""):
+    """
+    Intelligently determines whether the uploaded image is an indoor museum artifact / jewelry piece
+    versus an outdoor heritage landmark, based on Gemini classification and lexical description analysis.
+    """
+    if not gemini_res:
+        gemini_res = {}
+
+    scene_type = str(gemini_res.get("sceneType", "")).lower().strip()
+    is_artifact_flag = gemini_res.get("isArtifact")
+
+    # Explicit Gemini flags
+    if scene_type == "indoor" or is_artifact_flag is True:
+        return True
+
+    # Filename heuristic hints
+    if filename:
+        fn_lower = filename.lower()
+        if any(k in fn_lower for k in ["jewelry", "jewellery", "artifact", "necklace", "bracelet", "ring", "pendant", "item_"]):
+            return True
+
+    # Lexical analysis of description, reason, and landmark title
+    combined_txt = (
+        str(gemini_res.get("description", "")) + " " +
+        str(gemini_res.get("reason", "")) + " " +
+        str(gemini_res.get("possibleLandmark", ""))
+    ).lower()
+
+    indoor_keywords = [
+        "jewelry", "jewellery", "necklace", "bracelet", "ring", "pendant", "bead",
+        "amulet", "pectoral", "collar", "gold", "earring", "brooch",
+        "museum", "display case", "glass case", "vitrine", "exhibit", "showcase",
+        "indoor", "artifact", "artefact", "pottery", "ceramic", "coffin", "sarcophagus",
+        "funerary mask", "golden mask", "canopic", "shabti", "ushabti", "scarab",
+        "figurine", "statue in glass"
+    ]
+
+    outdoor_keywords = [
+        "pyramid", "temple", "monument", "sphinx", "obelisk", "citadel",
+        "palace", "mastaba", "tomb exterior", "facade", "column", "pylon",
+        "hypostyle", "desert", "sky", "horizon", "ruins", "landscape", "outdoor"
+    ]
+
+    indoor_matches = sum(1 for kw in indoor_keywords if kw in combined_txt)
+    outdoor_matches = sum(1 for kw in outdoor_keywords if kw in combined_txt)
+
+    if indoor_matches > outdoor_matches and indoor_matches >= 1:
+        return True
+
+    return False
 
 # ─── Dataset & Bounding Box Helpers ──────────────────────────────────────────
 def compute_hash(image_bytes: bytes) -> str:
@@ -1645,6 +1704,9 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
             encoded_image = base64.b64encode(buffer).decode('utf-8')
             
             return {
+                'pipeline': 'landmark_detection',
+                'scene_type': 'outdoor',
+                'router_msg': f"🏛️ AI Auto-Detected: Outdoor Heritage Landmark ({cls_name_alt}) → Landmark Explorer Active",
                 'image': f"data:image/jpeg;base64,{encoded_image}",
                 'detections': detections,
                 'inference_time': f"{inference_time:.1f}ms",
@@ -1796,6 +1858,49 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
         
         # Run Gemini
         gemini_res = analyze_with_gemini(file_bytes, mimetype, nearby_landmarks_str)
+
+        # ── Smart Pipeline Auto-Router (Indoor Museum Artifact vs Outdoor Landmark) ──
+        if is_indoor_artifact(gemini_res, filename):
+            print(f"[AUTO-ROUTER] 💎 Gemini classified '{filename}' as an Indoor Museum Artifact / Jewelry piece! Executing FastSAM segmentation pipeline...")
+            try:
+                pipeline = get_artifact_pipeline()
+                output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "outputs"))
+                seg_res = pipeline.process_image(img, output_dir=output_dir)
+
+                with open(seg_res["detection_path"], "rb") as f:
+                    det_b64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode('utf-8')
+
+                with open(seg_res["segmentation_path"], "rb") as f:
+                    seg_b64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode('utf-8')
+
+                items_enhanced = []
+                for item in seg_res["results"]["items"]:
+                    obj_path = os.path.join(output_dir, item["segmented_image"])
+                    item_data = dict(item)
+                    item_data["url"] = f"/outputs/{item['segmented_image']}"
+                    if os.path.exists(obj_path):
+                        with open(obj_path, "rb") as of:
+                            item_data["image_base64"] = "data:image/png;base64," + base64.b64encode(of.read()).decode('utf-8')
+                    items_enhanced.append(item_data)
+
+                landmark_label = gemini_res.get("possibleLandmark")
+                label_txt = f" ({landmark_label})" if landmark_label and landmark_label != "Unknown" else ""
+
+                return {
+                    'pipeline': 'artifact_segmentation',
+                    'scene_type': 'indoor',
+                    'success': True,
+                    'detection_image': det_b64,
+                    'segmentation_image': seg_b64,
+                    'items': items_enhanced,
+                    'results_json': seg_res["results"],
+                    'num_items': len(items_enhanced),
+                    'gemini': gemini_res,
+                    'router_msg': f"💎 AI Auto-Detected: Indoor Museum Artifact{label_txt} → FastSAM Segmentation Pipeline Executed"
+                }
+            except Exception as seg_err:
+                print(f"[WARNING] Auto-routed artifact pipeline failed: {seg_err}, falling back to landmark pipeline")
+
         suggested_landmark = gemini_res.get("possibleLandmark", "Unknown")
         description = gemini_res.get("description", "")
         confidence_val = gemini_res.get("confidence", 80) / 100.0
@@ -1918,6 +2023,9 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
             auto_posts = list(db.posts.find({"object_id": existing_db_obj["object_id"]}).sort("createdAt", -1))
         
         return {
+            'pipeline': 'landmark_detection',
+            'scene_type': 'outdoor',
+            'router_msg': f"🏛️ AI Auto-Detected: Outdoor Heritage Landmark ({suggested_landmark}) → Landmark Explorer Active",
             'image': f"data:image/jpeg;base64,{encoded_image}",
             'detections': [{'class': suggested_landmark, 'confidence': f"{confidence_val:.2%}"}],
             'inference_time': f"{(time.time() - t0)*1000:.1f}ms",

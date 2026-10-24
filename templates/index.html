@@ -2318,18 +2318,19 @@
                     🥽 Launch Live AR Experience
                 </button>
 
-                <!-- Scan Pipeline Mode Tabs -->
-                <div class="scan-pipeline-tabs" style="display: flex; gap: 6px; margin-top: 14px; background: rgba(0,0,0,0.35); padding: 4px; border-radius: 10px; border: 1px solid rgba(255,255,255,0.08);">
-                    <button type="button" id="tab-scan-landmark" class="scan-tab-btn active" style="flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid rgba(16,185,129,0.3); font-size: 0.84rem; font-weight: 700; cursor: pointer; background: rgba(16, 185, 129, 0.18); color: #34d399; transition: all 0.2s;">
-                        🏛️ Landmark Detection
-                    </button>
-                    <button type="button" id="tab-scan-artifact" class="scan-tab-btn" style="flex: 1; padding: 10px 12px; border-radius: 8px; border: 1px solid transparent; font-size: 0.84rem; font-weight: 700; cursor: pointer; background: transparent; color: #94a3b8; transition: all 0.2s;">
-                        💎 Museum Artifacts
-                    </button>
+                <!-- Smart AI Auto-Routing Mode Status Pill (Zero User Selection Required) -->
+                <div style="display: flex; align-items: center; justify-content: space-between; margin-top: 14px; padding: 10px 14px; background: rgba(0,0,0,0.35); border-radius: 10px; border: 1px solid rgba(255,255,255,0.08); font-size: 0.82rem;">
+                    <div style="display: flex; align-items: center; gap: 8px;">
+                        <span class="pulse-dot" style="width: 8px; height: 8px; background: #38bdf8; box-shadow: 0 0 10px #38bdf8;"></span>
+                        <span style="color: var(--text-muted); font-weight: 600;">Scan Pipeline:</span>
+                    </div>
+                    <span id="scan-mode-indicator" style="font-weight: 800; color: #38bdf8; letter-spacing: 0.02em;">
+                        🧠 Smart AI Auto (Indoor / Outdoor)
+                    </span>
                 </div>
 
                 <button class="btn-detect" id="btn-detect" disabled>
-                    🏛️ Detect &amp; Find Posts
+                    🔍 Start AI Heritage Scan
                 </button>
 
                 <!-- Status Banner for Pipeline Execution -->
@@ -3856,8 +3857,21 @@
             console.log('[SCANNER] Result keys: ' + Object.keys(data).join(', '));
             console.log('[SCANNER] detections: ' + JSON.stringify(data.detections || []).substring(0, 200));
             console.log('[SCANNER] unknown: ' + data.unknown + ' | auto_confirmed: ' + data.auto_confirmed);
-            if (data.gemini) {
-                console.log('[SCANNER] gemini: ' + JSON.stringify(data.gemini).substring(0, 200));
+            // If live scanner detected an indoor museum artifact / jewelry display
+            if (data.pipeline === 'artifact_segmentation') {
+                console.log('[SCANNER] 💎 Live scanner auto-routed to Artifact Segmentation!');
+                stopLiveScannerLoop();
+                closeCamera();
+                const resCont = document.getElementById('result-container');
+                if (resCont) resCont.style.display = 'none';
+                const artCont = document.getElementById('artifact-segmentation-container');
+                if (artCont) artCont.style.display = 'flex';
+                if (typeof window.renderArtifactResults === 'function') {
+                    window.renderArtifactResults(data);
+                }
+                updateScanModeIndicator('indoor', '💎 Indoor Museum Artifact (FastSAM)');
+                showToast(data.router_msg || '💎 AI Auto-Detected: Indoor Museum Artifact → FastSAM Segmentation');
+                return;
             }
 
             // Check if a landmark was recognized - accept YOLO, auto-confirmed Gemini, OR high-confidence Gemini
@@ -3956,63 +3970,28 @@
         const tabScanLandmark = document.getElementById('tab-scan-landmark');
         const tabScanArtifact = document.getElementById('tab-scan-artifact');
 
-        function setScanMode(mode) {
-            currentScanMode = mode;
-            if (mode === 'artifact') {
-                if (tabScanArtifact) {
-                    tabScanArtifact.style.background = 'rgba(168, 85, 247, 0.2)';
-                    tabScanArtifact.style.color = '#c084fc';
-                    tabScanArtifact.style.borderColor = 'rgba(168, 85, 247, 0.5)';
-                }
-                if (tabScanLandmark) {
-                    tabScanLandmark.style.background = 'transparent';
-                    tabScanLandmark.style.color = '#94a3b8';
-                    tabScanLandmark.style.borderColor = 'transparent';
-                }
-                if (!btnDetect.disabled) {
-                    btnDetect.innerHTML = `⚡ Run Artifact Segmentation`;
-                }
-                btnDetect.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
+        // ── Smart Auto-Detection Indicator ──
+        function updateScanModeIndicator(mode, text) {
+            const ind = document.getElementById('scan-mode-indicator');
+            if (!ind) return;
+            if (mode === 'indoor') {
+                ind.textContent = text || '💎 Indoor Museum Artifact (FastSAM)';
+                ind.style.color = '#c084fc';
+            } else if (mode === 'outdoor') {
+                ind.textContent = text || '🏛️ Outdoor Heritage Landmark';
+                ind.style.color = '#34d399';
             } else {
-                if (tabScanLandmark) {
-                    tabScanLandmark.style.background = 'rgba(16, 185, 129, 0.18)';
-                    tabScanLandmark.style.color = '#34d399';
-                    tabScanLandmark.style.borderColor = 'rgba(16, 185, 129, 0.3)';
-                }
-                if (tabScanArtifact) {
-                    tabScanArtifact.style.background = 'transparent';
-                    tabScanArtifact.style.color = '#94a3b8';
-                    tabScanArtifact.style.borderColor = 'transparent';
-                }
-                if (!btnDetect.disabled) {
-                    btnDetect.innerHTML = `🏛️ Detect Landmark &amp; Find Posts`;
-                }
-                btnDetect.style.background = '';
+                ind.textContent = text || '🧠 Smart AI Auto (Indoor / Outdoor)';
+                ind.style.color = '#38bdf8';
             }
         }
-        window.setScanMode = setScanMode;
-
-        if (tabScanLandmark) {
-            tabScanLandmark.addEventListener('click', () => setScanMode('landmark'));
-        }
-        if (tabScanArtifact) {
-            tabScanArtifact.addEventListener('click', () => setScanMode('artifact'));
-        }
+        window.updateScanModeIndicator = updateScanModeIndicator;
 
         btnDetect.addEventListener('click', async () => {
             if (!selectedFile) return;
 
-            if (currentScanMode === 'artifact') {
-                if (typeof window.runArtifactSegmentation === 'function') {
-                    window.runArtifactSegmentation(selectedFile);
-                } else {
-                    showToast('Artifact segmentation module is initializing...');
-                }
-                return;
-            }
-
             btnDetect.disabled = true;
-            btnDetect.innerHTML = `⏳ Uploading Image...`;
+            btnDetect.innerHTML = `🔍 Uploading Image...`;
 
             const formData = new FormData();
             formData.append('image', selectedFile);
@@ -4043,7 +4022,7 @@
                     try { const errJson = JSON.parse(errText); if (errJson.error) errMsg = errJson.error; } catch (e) { }
                     showToast(`Error: ${errMsg}`);
                     btnDetect.disabled = false;
-                    btnDetect.innerHTML = `🏛️ Detect & Find Posts`;
+                    btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
                     return;
                 }
 
@@ -4053,14 +4032,14 @@
                 if (!jobResp.job_id) {
                     processDetectResult(jobResp);
                     btnDetect.disabled = false;
-                    btnDetect.innerHTML = `🏛️ Detect & Find Posts`;
+                    btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
                     return;
                 }
 
                 // Step 2: Poll for result
                 const jobId = jobResp.job_id;
                 let dots = 0;
-                const messages = ['🔍 Running Detection...', '🧠 Analyzing with AI...', '🗺️ Matching Heritage Data...', '⏳ Almost there...'];
+                const messages = ['🔍 Scanning & Analyzing Scene...', '🧠 Gemini Classifying Indoor/Outdoor...', '⚡ Executing Optimal Pipeline...', '⏳ Finalizing AI Results...'];
                 let msgIdx = 0;
 
                 const pollInterval = setInterval(async () => {
@@ -4074,7 +4053,7 @@
                             clearInterval(pollInterval);
                             showToast('Error: Job expired. Please try again.');
                             btnDetect.disabled = false;
-                            btnDetect.innerHTML = `🏛️ Detect & Find Posts`;
+                            btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
                             return;
                         }
                         const pollData = await pollRes.json();
@@ -4082,7 +4061,7 @@
 
                         clearInterval(pollInterval);
                         btnDetect.disabled = false;
-                        btnDetect.innerHTML = `🏛️ Detect & Find Posts`;
+                        btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
 
                         if (pollData.error) { showToast(`Error: ${pollData.error}`); return; }
                         processDetectResult(pollData);
@@ -4094,13 +4073,38 @@
 
             } catch (err) {
                 btnDetect.disabled = false;
-                btnDetect.innerHTML = `🏛️ Detect & Find Posts`;
+                btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
                 showToast(`Detection failed: ${err.message}`);
             }
         });
 
         function processDetectResult(data) {
             if (data.error) { showToast(`Error: ${data.error}`); return; }
+
+            // ── AI Auto-Router: Check whether Backend Classified as Indoor Artifact or Outdoor Landmark ──
+            if (data.pipeline === 'artifact_segmentation') {
+                const resCont = document.getElementById('result-container');
+                if (resCont) resCont.style.display = 'none';
+
+                const artCont = document.getElementById('artifact-segmentation-container');
+                if (artCont) artCont.style.display = 'flex';
+
+                if (typeof window.renderArtifactResults === 'function') {
+                    window.renderArtifactResults(data);
+                }
+                updateScanModeIndicator('indoor', '💎 Indoor Museum Artifact (FastSAM)');
+                showToast(data.router_msg || '💎 AI Auto-Detected: Indoor Museum Artifact → FastSAM Segmentation Active');
+                return;
+            }
+
+            // Outdoor Heritage Landmark flow
+            const artCont = document.getElementById('artifact-segmentation-container');
+            if (artCont) artCont.style.display = 'none';
+
+            updateScanModeIndicator('outdoor', '🏛️ Outdoor Heritage Landmark');
+            if (data.router_msg) {
+                showToast(data.router_msg);
+            }
 
             // Recognition geometry remains available to curation, not drawn in the AR camera.
             if (window.originalPhotoDataUrl) {
@@ -4956,8 +4960,8 @@
                         if (typeof handleFile === 'function') {
                             handleFile(sampleFile);
                         }
-                        if (typeof window.setScanMode === 'function') {
-                            window.setScanMode('artifact');
+                        if (typeof window.updateScanModeIndicator === 'function') {
+                            window.updateScanModeIndicator('indoor', '💎 Museum Jewelry Sample Loaded');
                         }
                         const detectBtn = document.getElementById('btn-detect');
                         if (detectBtn) detectBtn.disabled = false;
@@ -5166,6 +5170,8 @@
                     resultsWrapper.scrollIntoView({ behavior: 'smooth', block: 'start' });
                 }
             }
+
+            window.renderArtifactResults = renderPipelineResults;
 
             // Copy JSON button
             if (btnCopyJson) {
