@@ -527,32 +527,37 @@ def is_indoor_artifact(gemini_res, filename=""):
         gemini_res = {}
 
     scene_type = str(gemini_res.get("sceneType", "")).lower().strip()
-    is_artifact_flag = gemini_res.get("isArtifact")
+    is_artifact_flag = bool(gemini_res.get("isArtifact", False))
+    landmark = str(gemini_res.get("possibleLandmark", "")).strip()
+    is_unknown = (landmark.lower() in ["", "unknown", "none"])
 
-    # Explicit Gemini flags
-    if scene_type == "indoor" or is_artifact_flag is True:
-        return True
-
-    # Filename heuristic hints
+    # Filename heuristic hints (e.g. test images named "necklace.jpg", "jewelry.png")
     if filename:
         fn_lower = filename.lower()
-        if any(k in fn_lower for k in ["jewelry", "jewellery", "artifact", "necklace", "bracelet", "ring", "pendant", "item_"]):
+        if any(k in fn_lower for k in ["jewelry", "jewellery", "necklace", "bracelet", "ring", "pendant", "item_"]):
             return True
+
+    # If Gemini explicitly flagged it as an artifact AND it's not an outdoor monument
+    if is_artifact_flag and scene_type != "outdoor":
+        return True
+
+    # Unknown scenes/camera frames (e.g. room, wall, desk) must NEVER trigger artifact segmentation
+    if is_unknown and not is_artifact_flag:
+        return False
 
     # Lexical analysis of description, reason, and landmark title
     combined_txt = (
         str(gemini_res.get("description", "")) + " " +
         str(gemini_res.get("reason", "")) + " " +
-        str(gemini_res.get("possibleLandmark", ""))
+        landmark
     ).lower()
 
     indoor_keywords = [
         "jewelry", "jewellery", "necklace", "bracelet", "ring", "pendant", "bead",
         "amulet", "pectoral", "collar", "gold", "earring", "brooch",
-        "museum", "display case", "glass case", "vitrine", "exhibit", "showcase",
-        "indoor", "artifact", "artefact", "pottery", "ceramic", "coffin", "sarcophagus",
+        "museum display", "display case", "glass case", "vitrine", "exhibit case",
         "funerary mask", "golden mask", "canopic", "shabti", "ushabti", "scarab",
-        "figurine", "statue in glass"
+        "ancient figurine", "statue in glass", "tomb artifact"
     ]
 
     outdoor_keywords = [
