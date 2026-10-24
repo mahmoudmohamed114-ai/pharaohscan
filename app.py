@@ -411,27 +411,23 @@ def analyze_with_gemini(image_bytes, mime_type, nearby_landmarks_str):
             "reason": "Gemini API key is missing. Using pre-loaded mock descriptor."
         }
         
-    prompt = f"""You are an expert AI Egyptian heritage, archaeology, and museum identification assistant.
+    prompt = f"""You are a heritage landmark and artifact identification assistant.
 
 The image was captured near these known heritage landmarks:
 {nearby_landmarks_str}
 
-Analyse the uploaded image carefully:
-1. Determine if this image shows:
-   - "indoor": An indoor museum artifact, jewelry (necklaces, bracelets, rings, pendants, beads, gold collar), antiquity, mask, statue inside a museum/case, or individual historical items.
-   - "outdoor": An outdoor monument, architectural site, pyramid, temple, outdoor tomb, or landscape landmark.
-2. Identify the specific landmark or artifact visible.
-3. If the image clearly shows one of the nearby listed landmarks, use that exact name and set "isNewLandmark" to false.
-4. If the image shows a different, identifiable landmark or artifact that is NOT in the nearby list, name it and set "isNewLandmark" to true.
-5. If no recognisable landmark or artifact is visible, set "possibleLandmark" to "Unknown" and "isNewLandmark" to false.
-6. Provide GPS coordinates if known (or null).
+Analyse the uploaded image carefully and identify any heritage site, landmark, monument, museum artifact, antiquity, or jewelry piece visible in it.
+
+Rules:
+1. If the image clearly shows one of the nearby listed landmarks, use that exact name and set "isNewLandmark" to false.
+2. If the image shows a different, identifiable landmark or museum artifact that is NOT in the nearby list, name it and set "isNewLandmark" to true.
+3. If no recognisable landmark or artifact is visible, set "possibleLandmark" to "Unknown" and "isNewLandmark" to false.
+4. Provide the real-world GPS coordinates of the identified landmark if known (or null).
 
 Return ONLY a valid JSON object — no markdown fences, no extra text:
 {{
   "description": "Detailed visual description of what is shown in the image",
   "possibleLandmark": "Name of the identified landmark or artifact",
-  "sceneType": "indoor",
-  "isArtifact": true,
   "isNewLandmark": false,
   "confidence": 85,
   "reason": "Brief explanation supporting your identification",
@@ -440,8 +436,6 @@ Return ONLY a valid JSON object — no markdown fences, no extra text:
 }}
 
 confidence must be an integer from 0 to 100.
-sceneType must be strictly either "indoor" or "outdoor".
-isArtifact must be true for museum items/jewelry/antiquities, and false for architectural landmarks/monuments.
 latitude and longitude must be real decimal numbers (e.g. 48.8584, 2.2945) or null if unknown."""
 
     b64_data = base64.b64encode(image_bytes).decode('utf-8')
@@ -1648,74 +1642,7 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                     'posts': serialize_mongo(posts)
                 }
 
-        # 2. Query Gemini Vision (Runs in Google Cloud, takes 0MB Server RAM)
-        try:
-            lat_context = float(lat_form)
-            lng_context = float(lng_form)
-        except:
-            lat_context = 29.9792
-            lng_context = 31.1342
-        geohashes = get_geohash_neighbors(lat_context, lng_context, 6)
-        nearby_locs = list(db.locations.find({"geohash": {"$in": geohashes}}))
-        nearby_objs = []
-        for loc in nearby_locs:
-            objs = list(db.objects.find({"location_id": loc["location_id"]}))
-            for o in objs:
-                nearby_objs.append(f"{o['name']} (at {loc['name']})")
-        nearby_landmarks_str = "\n".join([f"  - {o}" for o in nearby_objs])
-
-        try:
-            gemini_res = analyze_with_gemini(file_bytes, mimetype, nearby_landmarks_str)
-        except Exception as g_err:
-            print(f"[WARNING] Gemini vision API error: {g_err}")
-            gemini_res = {"possibleLandmark": "Unknown", "description": "", "sceneType": "outdoor", "isArtifact": False}
-
-        # ── Smart Pipeline Auto-Router Branch A: Indoor Museum Artifact ─────────────────
-        if is_indoor_artifact(gemini_res, filename):
-            print(f"[AUTO-ROUTER] 💎 Gemini classified '{filename}' as an Indoor Museum Artifact / Jewelry piece! Executing FastSAM segmentation pipeline...")
-            try:
-                pipeline = get_artifact_pipeline()
-                output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "outputs"))
-                seg_res = pipeline.process_image(img, output_dir=output_dir)
-
-                with open(seg_res["detection_path"], "rb") as f:
-                    det_b64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode('utf-8')
-
-                with open(seg_res["segmentation_path"], "rb") as f:
-                    seg_b64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode('utf-8')
-
-                items_enhanced = []
-                for item in seg_res["results"]["items"]:
-                    obj_path = os.path.join(output_dir, item["segmented_image"])
-                    item_data = dict(item)
-                    item_data["url"] = f"/outputs/{item['segmented_image']}"
-                    if os.path.exists(obj_path):
-                        with open(obj_path, "rb") as of:
-                            item_data["image_base64"] = "data:image/png;base64," + base64.b64encode(of.read()).decode('utf-8')
-                    items_enhanced.append(item_data)
-
-                landmark_label = gemini_res.get("possibleLandmark")
-                label_txt = f" ({landmark_label})" if landmark_label and landmark_label != "Unknown" else ""
-
-                return {
-                    'pipeline': 'artifact_segmentation',
-                    'scene_type': 'indoor',
-                    'success': True,
-                    'detection_image': det_b64,
-                    'segmentation_image': seg_b64,
-                    'items': items_enhanced,
-                    'results_json': seg_res["results"],
-                    'num_items': len(items_enhanced),
-                    'gemini': gemini_res,
-                    'router_msg': f"💎 AI Auto-Detected: Indoor Museum Artifact{label_txt} → FastSAM Segmentation Pipeline Executed"
-                }
-            except Exception as seg_err:
-                print(f"[WARNING] Auto-routed artifact pipeline failed: {seg_err}, falling back to landmark pipeline")
-            finally:
-                gc.collect()
-
-        # ── Smart Pipeline Auto-Router Branch B: Outdoor Heritage Landmark ──────────────
-        # Only now load YOLO model into RAM (FastSAM is never loaded, saving 250MB+ RAM!)
+        # 2. Run standard YOLO model prediction
         BACKGROUND_NOISE_CLASSES = {
             'car', 'truck', 'bus', 'person', 'bicycle', 'motorcycle', 'traffic light', 
             'stop sign', 'bench', 'parking meter', 'dog', 'cat', 'airplane', 'train', 
@@ -1956,9 +1883,27 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
             except Exception as e:
                 print(f"[WARNING] Custom classes YOLO-World detection failed: {e}")
 
-        # 4. Unknown landmark fallback — zero-shot pipeline
-        print(f"[INFO] Using Gemini Zero-Shot Fallback for: {filename}")
+        # 4. Unknown landmark / artifact fallback — Gemini Zero-Shot pipeline
+        print(f"[INFO] Running Gemini Zero-Shot Fallback for: {filename}")
 
+        # Read user active GPS coordinate from request
+        try:
+            lat_context = float(lat_form)
+            lng_context = float(lng_form)
+        except:
+            lat_context = 29.9792
+            lng_context = 31.1342
+        geohashes = get_geohash_neighbors(lat_context, lng_context, 6)
+        nearby_locs = list(db.locations.find({"geohash": {"$in": geohashes}}))
+
+        nearby_objs = []
+        for loc in nearby_locs:
+            objs = list(db.objects.find({"location_id": loc["location_id"]}))
+            for o in objs:
+                nearby_objs.append(f"{o['name']} (at {loc['name']})")
+        nearby_landmarks_str = "\n".join([f"  - {o}" for o in nearby_objs])
+
+        gemini_res = analyze_with_gemini(file_bytes, mimetype, nearby_landmarks_str)
         suggested_landmark = gemini_res.get("possibleLandmark", "Unknown")
         description = gemini_res.get("description", "")
         confidence_val = gemini_res.get("confidence", 80) / 100.0
