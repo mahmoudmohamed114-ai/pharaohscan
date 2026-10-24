@@ -1,3 +1,12 @@
+# ─── Threading & Memory Optimization for Cloud Containers (prevents OOM / SIGKILL) ─
+import os
+os.environ["OMP_NUM_THREADS"] = "1"
+os.environ["MKL_NUM_THREADS"] = "1"
+os.environ["OPENBLAS_NUM_THREADS"] = "1"
+os.environ["VECLIB_MAXIMUM_THREADS"] = "1"
+os.environ["NUMEXPR_NUM_THREADS"] = "1"
+os.environ["TORCH_NUM_THREADS"] = "1"
+
 # ─── eventlet monkey-patch (MUST be first import for Railway/gunicorn + SocketIO) ─
 try:
     import eventlet
@@ -5,7 +14,13 @@ try:
 except ImportError:
     pass  # Local dev without eventlet is fine
 
-import os
+import gc
+try:
+    import torch
+    torch.set_num_threads(1)
+    torch.set_num_interop_threads(1)
+except Exception:
+    pass
 import re
 import sys
 import json
@@ -1023,6 +1038,8 @@ def api_segment_artifacts():
         import traceback
         traceback.print_exc()
         return jsonify({'error': str(e)}), 500
+    finally:
+        gc.collect()
 
 # ---------------------------------------------------------
 # Dynamic AI-Powered Artifact Description Engine & Cache (Prompt 4)
@@ -1900,6 +1917,8 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                 }
             except Exception as seg_err:
                 print(f"[WARNING] Auto-routed artifact pipeline failed: {seg_err}, falling back to landmark pipeline")
+            finally:
+                gc.collect()
 
         suggested_landmark = gemini_res.get("possibleLandmark", "Unknown")
         description = gemini_res.get("description", "")
@@ -2676,26 +2695,10 @@ def api_health():
         }
     })
 
-# ─── Background Model Warmup ──────────────────────────────────────────────────
+# ─── Lazy Model Loading Configuration (Conserves Cloud RAM) ────────────────────
 def _warmup_models():
-    """Pre-load YOLO models in the background so the first user request is fast."""
-    import threading
-    def _load():
-        try:
-            print("[WARMUP] Pre-loading YOLOv8 model...")
-            get_yolo_v8()
-            print("[WARMUP] YOLOv8 ready.")
-            print("[WARMUP] Pre-loading YOLO11 model...")
-            get_yolo_y11()
-            print("[WARMUP] YOLO11 ready.")
-            print("[WARMUP] Pre-loading Artifact Segmentation Pipeline...")
-            get_artifact_pipeline()
-            print("[WARMUP] Artifact Segmentation Pipeline ready.")
-            print("[WARMUP] All models pre-loaded successfully.")
-        except Exception as e:
-            print(f"[WARMUP] Model pre-load failed (non-fatal): {e}")
-    t = threading.Thread(target=_load, daemon=True)
-    t.start()
+    """Configures models for lazy on-demand loading to prevent startup OOM / SIGKILL on cloud containers."""
+    print("[INFO] Memory optimization: Models configured for lazy on-demand loading (no eager startup allocation).")
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
@@ -2703,5 +2706,5 @@ if __name__ == '__main__':
     _warmup_models()
     socketio.run(app, host='0.0.0.0', port=port, debug=False, allow_unsafe_werkzeug=True)
 else:
-    # Running under gunicorn — warmup after first request context is ready
+    # Running under gunicorn — keep RAM minimal on boot
     _warmup_models()
