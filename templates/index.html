@@ -2316,6 +2316,26 @@
                     🔍 Start AI Heritage Scan
                 </button>
 
+                <!-- ── Live AI Scan Progress Widget ── -->
+                <div id="scan-progress-widget" style="display: none; margin-top: 14px; background: rgba(15, 23, 42, 0.85); border: 1px solid rgba(56, 189, 248, 0.35); border-radius: 12px; padding: 14px 16px; backdrop-filter: blur(12px); box-shadow: 0 4px 20px rgba(0,0,0,0.5);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+                        <span id="scan-progress-label" style="font-size: 0.85rem; font-weight: 700; color: #38bdf8; display: flex; align-items: center; gap: 6px;">
+                            <span class="pulse-dot" style="background: #38bdf8; width: 8px; height: 8px;"></span>
+                            <span id="scan-step-text">Starting AI Analysis...</span>
+                        </span>
+                        <span id="scan-progress-pct" style="font-size: 0.85rem; font-weight: 800; color: #f1f5f9; font-variant-numeric: tabular-nums;">
+                            0%
+                        </span>
+                    </div>
+                    <!-- Track -->
+                    <div style="width: 100%; height: 8px; background: rgba(255, 255, 255, 0.1); border-radius: 999px; overflow: hidden; position: relative;">
+                        <div id="scan-progress-bar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #38bdf8, #10b981, #c084fc); border-radius: 999px; transition: width 0.35s ease; box-shadow: 0 0 12px rgba(56, 189, 248, 0.6);"></div>
+                    </div>
+                    <div id="scan-progress-subtext" style="font-size: 0.75rem; color: #94a3b8; margin-top: 6px; text-align: right;">
+                        Processing on Cloud AI Engine
+                    </div>
+                </div>
+
                 <!-- Status Banner for Pipeline Execution -->
                 <div id="artifact-processing-status" style="display: none; background: rgba(99, 102, 241, 0.15); border: 1px solid rgba(99, 102, 241, 0.4); border-radius: 10px; padding: 12px 16px; align-items: center; gap: 12px; margin-top: 12px;">
                     <div class="pulse-dot" style="background: #818cf8; box-shadow: 0 0 10px #818cf8;"></div>
@@ -4000,11 +4020,35 @@
             });
         }
 
+        function setScanProgress(pct, stepText, subText) {
+            const widget = document.getElementById('scan-progress-widget');
+            const bar = document.getElementById('scan-progress-bar');
+            const pctEl = document.getElementById('scan-progress-pct');
+            const stepEl = document.getElementById('scan-step-text');
+            const subEl = document.getElementById('scan-progress-subtext');
+
+            if (!widget) return;
+            widget.style.display = 'block';
+
+            if (bar) bar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+            if (pctEl) pctEl.textContent = `${Math.round(pct)}%`;
+            if (stepEl && stepText) stepEl.textContent = stepText;
+            if (subEl && subText) subEl.textContent = subText;
+        }
+
+        function hideScanProgress(delayMs = 600) {
+            setTimeout(() => {
+                const widget = document.getElementById('scan-progress-widget');
+                if (widget) widget.style.display = 'none';
+            }, delayMs);
+        }
+
         btnDetect.addEventListener('click', async () => {
             if (!selectedFile) return;
 
             btnDetect.disabled = true;
-            btnDetect.innerHTML = `🔍 Preparing Image...`;
+            btnDetect.innerHTML = `⏳ Initializing Scan...`;
+            setScanProgress(15, '🖼️ Preparing & Optimizing Photo...', 'Resizing canvas for fast cloud processing');
 
             let fileToSend = selectedFile;
             try {
@@ -4013,7 +4057,8 @@
                 console.warn('Image prep warning:', prepErr);
             }
 
-            btnDetect.innerHTML = `🔍 Uploading Image...`;
+            btnDetect.innerHTML = `🚀 Uploading Image...`;
+            setScanProgress(30, '🚀 Uploading to PharaohScan Cloud AI...', 'Securely transmitting image payload');
 
             const formData = new FormData();
             formData.append('image', fileToSend);
@@ -4045,6 +4090,7 @@
                     showToast(`Error: ${errMsg}`);
                     btnDetect.disabled = false;
                     btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
+                    hideScanProgress(0);
                     return;
                 }
 
@@ -4052,22 +4098,29 @@
 
                 // Handle legacy sync response (no job_id)
                 if (!jobResp.job_id) {
+                    setScanProgress(100, '🎉 Scan Complete!', 'Rendering heritage results');
+                    hideScanProgress(600);
                     processDetectResult(jobResp);
                     btnDetect.disabled = false;
                     btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
                     return;
                 }
 
-                // Step 2: Poll for result
+                // Step 2: Poll for result (Fast 1000ms polling with live progress stages)
                 const jobId = jobResp.job_id;
-                let dots = 0;
-                const messages = ['🔍 Scanning & Analyzing Scene...', '🧠 Gemini Classifying Indoor/Outdoor...', '⚡ Executing Optimal Pipeline...', '⏳ Finalizing AI Results...'];
-                let msgIdx = 0;
+                let pollCount = 0;
+                const stages = [
+                    { pct: 55, title: '🧠 Gemini Vision Scene Analysis...', sub: 'Classifying indoor museum artifacts vs outdoor landmarks' },
+                    { pct: 75, title: '⚡ Executing Optimal AI Pipeline...', sub: 'Running neural instance segmentation / landmark detection' },
+                    { pct: 88, title: '✂️ Isolating Transparent Object Masks...', sub: 'Preserving detailed chain links, bead loops & borders' },
+                    { pct: 95, title: '⏳ Finalizing Heritage Results...', sub: 'Compiling historic descriptions & database matches' }
+                ];
 
                 const pollInterval = setInterval(async () => {
-                    dots = (dots + 1) % 4;
-                    btnDetect.innerHTML = messages[msgIdx % messages.length] + '.'.repeat(dots + 1);
-                    msgIdx++;
+                    const currentStage = stages[Math.min(pollCount, stages.length - 1)];
+                    setScanProgress(currentStage.pct, currentStage.title, currentStage.sub);
+                    btnDetect.innerHTML = currentStage.title;
+                    pollCount++;
 
                     try {
                         const pollRes = await fetch(`/api/detect/result/${jobId}`);
@@ -4076,6 +4129,7 @@
                             showToast('Error: Job expired. Please try again.');
                             btnDetect.disabled = false;
                             btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
+                            hideScanProgress(0);
                             return;
                         }
                         const pollData = await pollRes.json();
@@ -4085,17 +4139,25 @@
                         btnDetect.disabled = false;
                         btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
 
-                        if (pollData.error) { showToast(`Error: ${pollData.error}`); return; }
+                        if (pollData.error) {
+                            hideScanProgress(0);
+                            showToast(`Error: ${pollData.error}`);
+                            return;
+                        }
+
+                        setScanProgress(100, '🎉 Scan Complete!', 'Rendering heritage results');
+                        hideScanProgress(700);
                         processDetectResult(pollData);
 
                     } catch (pollErr) {
                         console.warn('Polling error:', pollErr);
                     }
-                }, 2000);
+                }, 1000);
 
             } catch (err) {
                 btnDetect.disabled = false;
                 btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
+                hideScanProgress(0);
                 showToast(`Detection failed: ${err.message}`);
             }
         });
@@ -4950,6 +5012,22 @@
         // ════════════════════════════════════════════════════════════════
         (function initArtifactPipelineUI() {
             const container = document.getElementById('artifact-segmentation-container');
+            const statusBanner = document.getElementById('artifact-processing-status');
+            const statusTitle = document.getElementById('artifact-status-title');
+            const statusDesc = document.getElementById('artifact-status-desc');
+
+            const resultsWrapper = document.getElementById('artifact-results-wrapper');
+            const kpiCount = document.getElementById('kpi-item-count');
+            const kpiAvgConf = document.getElementById('kpi-avg-conf');
+
+            const imgDetection = document.getElementById('img-output-detection');
+            const imgSegmentation = document.getElementById('img-output-segmentation');
+            const btnDlDetection = document.getElementById('btn-dl-detection');
+            const btnDlSegmentation = document.getElementById('btn-dl-segmentation');
+
+            const galleryContainer = document.getElementById('extracted-gallery-container');
+            const jsonDisplay = document.getElementById('results-json-display');
+            const btnCopyJson = document.getElementById('btn-copy-json');
 
             // Client-side image resizing helper (prevents cloud server 502/OOM from 12MP phone photos)
             function compressImageIfNeeded(file, maxDim = 1280) {
