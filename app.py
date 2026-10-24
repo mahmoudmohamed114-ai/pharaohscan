@@ -449,7 +449,7 @@ latitude and longitude must be real decimal numbers (e.g. 48.8584, 2.2945) or nu
     
     # 1. Try Direct REST endpoint with available Gemini models in priority order
     last_error = "No error"
-    for model_name in ["gemini-3.5-flash-lite", "gemini-3-flash-preview", "gemini-2.5-flash", "gemini-flash-latest"]:
+    for model_name in ["gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash", "gemini-flash-latest"]:
         try:
             url = f"https://generativelanguage.googleapis.com/v1beta/models/{model_name}:generateContent?key={gemini_key}"
             payload = {
@@ -468,7 +468,7 @@ latitude and longitude must be real decimal numbers (e.g. 48.8584, 2.2945) or nu
                 data=json.dumps(payload).encode('utf-8'),
                 headers={"Content-Type": "application/json", "User-Agent": "PharaohScan/1.0"}
             )
-            with urllib.request.urlopen(req, timeout=20) as response:
+            with urllib.request.urlopen(req, timeout=10) as response:
                 res_data = json.loads(response.read().decode('utf-8'))
                 text = res_data["candidates"][0]["content"]["parts"][0]["text"].strip()
                 if text.startswith("```"):
@@ -914,13 +914,22 @@ def register_landmark_object(landmark_name, class_name=None, lat=None, lng=None,
 
 # ─── Async Job Queue with TTL (prevents premature 404 / Job expired errors) ───
 import threading
+try:
+    from eventlet import tpool
+    _HAS_TPOOL = True
+except Exception:
+    _HAS_TPOOL = False
+
 _job_store = {}   # job_id -> {"status": "pending"|"done"|"error", "result": {...}, "ts": float}
 _job_lock  = threading.Lock()
 
 def _run_detect_job(job_id, detect_fn, *args, **kwargs):
     """Run a detection job in a background thread and store the result."""
     try:
-        result = detect_fn(*args, **kwargs)
+        if _HAS_TPOOL:
+            result = tpool.execute(detect_fn, *args, **kwargs)
+        else:
+            result = detect_fn(*args, **kwargs)
         with _job_lock:
             _job_store[job_id] = {"status": "done", "result": result, "ts": time.time()}
     except Exception as e:
@@ -1853,20 +1862,24 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
         if custom_confirmed_classes:
             try:
                 yolo_world = get_yolo_world()
-                yolo_world.set_classes(custom_confirmed_classes)
-                world_res = yolo_world.predict(source=img, save=False, verbose=False)[0]
+                if yolo_world is not None:
+                    yolo_world.set_classes(custom_confirmed_classes)
+                    world_res = yolo_world.predict(source=img, save=False, verbose=False)[0]
+                else:
+                    world_res = None
                 
                 best_box = None
                 best_conf = 0.0
                 best_cls_name = None
                 
-                for box in world_res.boxes:
-                    conf = float(box.conf[0])
-                    if conf >= 0.35 and conf > best_conf:
-                        best_conf = conf
-                        best_box = box.xywhn[0].tolist()
-                        cls_idx = int(box.cls[0])
-                        best_cls_name = custom_confirmed_classes[cls_idx] if cls_idx < len(custom_confirmed_classes) else custom_confirmed_classes[0]
+                if world_res is not None and hasattr(world_res, 'boxes'):
+                    for box in world_res.boxes:
+                        conf = float(box.conf[0])
+                        if conf >= 0.35 and conf > best_conf:
+                            best_conf = conf
+                            best_box = box.xywhn[0].tolist()
+                            cls_idx = int(box.cls[0])
+                            best_cls_name = custom_confirmed_classes[cls_idx] if cls_idx < len(custom_confirmed_classes) else custom_confirmed_classes[0]
                         
                 if best_box and best_cls_name:
                     h_img, w_img, _ = img.shape
@@ -1961,11 +1974,12 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
         if suggested_landmark != "Unknown":
             try:
                 yolo_world = get_yolo_world()
-                yolo_world.set_classes([suggested_landmark])
-                world_res = yolo_world.predict(source=img, save=False, verbose=False)[0]
-                for box in world_res.boxes:
-                    box_norm = box.xywhn[0].tolist()
-                    break
+                if yolo_world is not None:
+                    yolo_world.set_classes([suggested_landmark])
+                    world_res = yolo_world.predict(source=img, save=False, verbose=False)[0]
+                    for box in world_res.boxes:
+                        box_norm = box.xywhn[0].tolist()
+                        break
             except Exception as e:
                 print(f"[WARNING] YOLO-World localization failed: {e}")
                 

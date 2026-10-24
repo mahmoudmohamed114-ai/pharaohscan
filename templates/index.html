@@ -3570,11 +3570,15 @@
                     formData.append('gyro_gamma', sensors.gamma || 0);
                 }
 
+                const uploadAbort = new AbortController();
+                const uploadTimeout = setTimeout(() => uploadAbort.abort(), 15000);
                 try {
                     const res = await fetch('/api/detect', {
                         method: 'POST',
-                        body: formData
+                        body: formData,
+                        signal: uploadAbort.signal
                     });
+                    clearTimeout(uploadTimeout);
 
                     console.log('[SCANNER] 📥 /api/detect response status: ' + res.status);
 
@@ -3602,6 +3606,7 @@
                     pollScannerJob(jobData.job_id);
 
                 } catch (netErr) {
+                    clearTimeout(uploadTimeout);
                     console.error('[SCANNER] ❌ Network error: ' + (netErr.message || netErr));
                     _isScanJobPending = false;
                     hideLiveScannerProgress(0);
@@ -3613,13 +3618,21 @@
         function pollScannerJob(jobId) {
             let attempts = 0;
             let consecutive404s = 0;
+            let isPollingActive = true;
             const maxAttempts = 22;
+
+            function stopScannerPolling() {
+                if (!isPollingActive) return;
+                isPollingActive = false;
+                clearInterval(pollTimer);
+                _isScanJobPending = false;
+                hideLiveScannerProgress(0);
+                setScannerUIState("Scanning for heritage landmarks...", false);
+            }
+
             const pollTimer = setInterval(async () => {
-                if (!_scannerActive) {
-                    console.log('[SCANNER] Scanner stopped during poll, aborting');
-                    clearInterval(pollTimer);
-                    _isScanJobPending = false;
-                    hideLiveScannerProgress(0);
+                if (!isPollingActive || !_scannerActive) {
+                    stopScannerPolling();
                     return;
                 }
 
@@ -3635,10 +3648,7 @@
                         consecutive404s++;
                         if (consecutive404s >= 4 || attempts >= maxAttempts) {
                             console.warn('[SCANNER] ⚠️ Poll exhausted (attempts=' + attempts + ', 404s=' + consecutive404s + ')');
-                            clearInterval(pollTimer);
-                            _isScanJobPending = false;
-                            hideLiveScannerProgress(0);
-                            setScannerUIState("Scanning for heritage landmarks...", false);
+                            stopScannerPolling();
                             return;
                         }
                         return; // Keep waiting for next tick
@@ -3646,10 +3656,7 @@
                     consecutive404s = 0;
 
                     if (attempts >= maxAttempts) {
-                        clearInterval(pollTimer);
-                        _isScanJobPending = false;
-                        hideLiveScannerProgress(0);
-                        setScannerUIState("Scanning for heritage landmarks...", false);
+                        stopScannerPolling();
                         return;
                     }
 
@@ -3659,6 +3666,7 @@
                     }
 
                     console.log('[SCANNER] ✅ Poll got result: ' + JSON.stringify(data).substring(0, 300));
+                    isPollingActive = false;
                     clearInterval(pollTimer);
                     _isScanJobPending = false;
                     setLiveScannerProgress(100, '✨ Heritage Landmark / Artifact Matched!');
@@ -3666,11 +3674,8 @@
                     handleScannerResult(data);
 
                 } catch (e) {
-                    console.error('[SCANNER] ❌ Poll error: ' + (e.message || e));
-                    clearInterval(pollTimer);
-                    _isScanJobPending = false;
-                    hideLiveScannerProgress(0);
-                    setScannerUIState("Scanning for heritage landmarks...", false);
+                    console.error('[SCANNER] ❌ Poll error:', (e.message || e));
+                    stopScannerPolling();
                 }
             }, 800);
         }
@@ -4147,12 +4152,16 @@
                 formData.append('accel_z', window.capturedPhotoSensors.z);
             }
 
+            const uploadAbort = new AbortController();
+            const uploadTimeout = setTimeout(() => uploadAbort.abort(), 25000);
             try {
                 // Step 1: POST image → get job_id immediately
                 const res = await fetch('/api/detect', {
                     method: 'POST',
-                    body: formData
+                    body: formData,
+                    signal: uploadAbort.signal
                 });
+                clearTimeout(uploadTimeout);
 
                 if (!res.ok) {
                     const errText = await res.text();
@@ -4180,6 +4189,9 @@
                 // Step 2: Poll for result (Fast 1000ms polling with live progress stages)
                 const jobId = jobResp.job_id;
                 let pollCount = 0;
+                let consecutive404s = 0;
+                let isPollingActive = true;
+
                 const stages = [
                     { pct: 55, title: '🧠 Gemini Vision Scene Analysis...', sub: 'Classifying indoor museum artifacts vs outdoor landmarks' },
                     { pct: 75, title: '⚡ Executing Optimal AI Pipeline...', sub: 'Running neural instance segmentation / landmark detection' },
@@ -4187,8 +4199,17 @@
                     { pct: 95, title: '⏳ Finalizing Heritage Results...', sub: 'Compiling historic descriptions & database matches' }
                 ];
 
-                let consecutive404s = 0;
+                function stopPolling() {
+                    if (!isPollingActive) return;
+                    isPollingActive = false;
+                    clearInterval(pollInterval);
+                    btnDetect.disabled = false;
+                    btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
+                }
+
                 const pollInterval = setInterval(async () => {
+                    if (!isPollingActive) return;
+
                     const currentStage = stages[Math.min(pollCount, stages.length - 1)];
                     setScanProgress(currentStage.pct, currentStage.title, currentStage.sub);
                     btnDetect.innerHTML = currentStage.title;
@@ -4198,13 +4219,11 @@
                         const pollRes = await fetch(`/api/detect/result/${jobId}`);
                         if (pollRes.status === 404) {
                             consecutive404s++;
-                            console.warn(`Poll returned 404 (attempt ${consecutive404s}/4)`);
+                            console.warn(`[POLL] 404 received (${consecutive404s}/4)`);
                             if (consecutive404s >= 4 || pollCount >= 35) {
-                                clearInterval(pollInterval);
-                                showToast('Error: Job expired or server busy. Please try again.');
-                                btnDetect.disabled = false;
-                                btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
+                                stopPolling();
                                 hideScanProgress(0);
+                                showToast('Notice: Scan job took too long or server refreshed. Please try again.');
                                 return;
                             }
                             return; // Wait for next tick
@@ -4213,9 +4232,7 @@
                         const pollData = await pollRes.json();
                         if (pollData.status === 'pending') return; // still running
 
-                        clearInterval(pollInterval);
-                        btnDetect.disabled = false;
-                        btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
+                        stopPolling();
 
                         if (pollData.error) {
                             hideScanProgress(0);
@@ -4228,15 +4245,17 @@
                         processDetectResult(pollData);
 
                     } catch (pollErr) {
-                        console.warn('Polling error:', pollErr);
+                        console.warn('[POLL] Network warning:', pollErr);
                     }
                 }, 1000);
 
             } catch (err) {
+                clearTimeout(uploadTimeout);
                 btnDetect.disabled = false;
                 btnDetect.innerHTML = `🔍 Start AI Heritage Scan`;
                 hideScanProgress(0);
-                showToast(`Detection failed: ${err.message}`);
+                const msg = err.name === 'AbortError' ? 'Upload timed out. Check your connection.' : err.message;
+                showToast(`Detection failed: ${msg}`);
             }
         });
 
