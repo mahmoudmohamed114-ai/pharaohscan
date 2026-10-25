@@ -99,43 +99,29 @@
             text-align: start;
         }
 
-        .brand-symbol {
-            width: 28px;
-            height: 32px;
+        .brand {
             display: flex;
-            gap: 4px;
-            align-items: flex-end;
+            align-items: center;
+            gap: 10px;
+            background: transparent;
+            padding: 4px 6px;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: opacity 0.2s;
         }
+        .brand:hover { opacity: 0.9; }
 
-        .brand-symbol i {
+        .brand-logo-img {
+            height: 42px;
+            width: auto;
+            max-width: 155px;
+            object-fit: contain;
             display: block;
-            width: 6px;
-            border: 1px solid var(--gold);
-            border-radius: 4px;
-            background: rgba(216, 183, 128, 0.2);
+            filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.4));
+            transition: transform 0.2s;
         }
-
-        .brand-symbol i:nth-child(1) { height: 18px; }
-        .brand-symbol i:nth-child(2) { height: 30px; }
-        .brand-symbol i:nth-child(3) { height: 23px; }
-
-        .wordmark {
-            font-size: 26px;
-            font-weight: 700;
-            line-height: 1.1;
-            color: var(--gold);
-            letter-spacing: 0.02em;
-        }
-
-        .wordmark small {
-            display: block;
-            font-family: Inter, sans-serif;
-            font-size: 9px;
-            font-weight: 600;
-            letter-spacing: 0.24em;
-            margin-top: 2px;
-            color: var(--paper);
-            opacity: 0.85;
+        .brand:hover .brand-logo-img {
+            transform: scale(1.03);
         }
 
         .desktop-links {
@@ -1058,6 +1044,199 @@
             flex-shrink: 0;
         }
 
+        /* ── Handwritten Pen & Memory Studio ── */
+        .memory-studio-tabs {
+            display: flex;
+            gap: 8px;
+            margin-bottom: 16px;
+            border-bottom: 1px solid var(--line);
+            padding-bottom: 8px;
+        }
+        .memory-tab-btn {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            padding: 8px 14px;
+            border-radius: 20px;
+            font-size: 12px;
+            font-weight: 500;
+            color: var(--muted);
+            border: 1px solid var(--line);
+            transition: all 0.2s;
+            cursor: pointer;
+        }
+        .memory-tab-btn.active {
+            background: var(--ink);
+            color: var(--paper);
+            border-color: var(--ink);
+            font-weight: 600;
+        }
+        .canvas-container {
+            position: relative;
+            background: #fffcf7;
+            border: 1.5px solid var(--bronze);
+            border-radius: 8px;
+            box-shadow: inset 0 2px 8px rgba(0, 0, 0, 0.04);
+            margin: 10px 0;
+            overflow: hidden;
+            touch-action: none;
+        }
+        #handwritten-canvas {
+            display: block;
+            width: 100%;
+            height: 180px;
+            cursor: crosshair;
+            background: transparent;
+        }
+        .canvas-toolbar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 10px;
+            background: #f7ede0;
+            border-top: 1px solid var(--line);
+            flex-wrap: wrap;
+            gap: 8px;
+        }
+        .pen-swatches {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .pen-swatch {
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 2px solid transparent;
+            cursor: pointer;
+            transition: transform 0.15s, border-color 0.15s;
+        }
+        .pen-swatch.active {
+            transform: scale(1.15);
+            border-color: var(--ink);
+        }
+        .pen-sizes {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .pen-size-btn {
+            font-size: 11px;
+            padding: 3px 8px;
+            border-radius: 12px;
+            border: 1px solid var(--line);
+            color: var(--muted);
+            cursor: pointer;
+        }
+        .pen-size-btn.active {
+            background: var(--ink);
+            color: #ffffff;
+            border-color: var(--ink);
+        }
+        .canvas-hint {
+            font-size: 11px;
+            color: var(--muted);
+            text-align: center;
+            margin-top: 4px;
+        }
+
+        /* ── Memory Archival Cards (Next to Object & in Memories Tab) ── */
+        .memory-archival-card {
+            background: #ffffff;
+            border: 1px solid var(--line);
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 3px 12px rgba(0, 0, 0, 0.05);
+            margin-bottom: 12px;
+            display: flex;
+            flex-direction: column;
+            transition: transform 0.2s;
+        }
+        .memory-archival-card:hover {
+            transform: translateY(-2px);
+        }
+        .memory-card-media {
+            position: relative;
+            width: 100%;
+            height: 190px;
+            background: var(--dark);
+            overflow: hidden;
+        }
+        .memory-card-media img.memory-photo {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        .memory-handwritten-overlay {
+            position: absolute;
+            inset: 0;
+            display: grid;
+            place-items: center;
+            pointer-events: none;
+            background: rgba(17, 16, 14, 0.2);
+        }
+        .memory-handwritten-overlay img {
+            max-width: 90%;
+            max-height: 85%;
+            object-fit: contain;
+            filter: drop-shadow(0 2px 5px rgba(0, 0, 0, 0.8));
+        }
+        .memory-signature-badge {
+            position: absolute;
+            bottom: 8px;
+            inset-inline-end: 8px;
+            background: rgba(17, 16, 14, 0.85);
+            color: var(--gold);
+            padding: 3px 8px;
+            border-radius: 12px;
+            font-size: 10px;
+            font-weight: 600;
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            border: 1px solid rgba(216, 183, 128, 0.4);
+        }
+        .memory-card-body {
+            padding: 12px 14px;
+        }
+        .memory-card-body strong {
+            font-size: 14px;
+            color: var(--ink);
+            display: block;
+        }
+        .memory-card-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 11px;
+            color: var(--muted);
+            margin-top: 6px;
+            padding-top: 6px;
+            border-top: 1px solid #f1ece4;
+        }
+
+        .btn-memory-gold {
+            background: linear-gradient(135deg, #2a2217, #15130f) !important;
+            border: 1.5px solid var(--gold) !important;
+            color: var(--gold) !important;
+            font-weight: 600 !important;
+            box-shadow: 0 2px 8px rgba(216, 183, 128, 0.2);
+        }
+        .btn-memory-gold:hover {
+            background: linear-gradient(135deg, #3d3223, #1e1b15) !important;
+            transform: translateY(-1px);
+        }
+
+        .memory-callout-card {
+            background: #fbf7f0;
+            border: 1px solid #e0d3c1;
+            border-radius: 8px;
+            padding: 14px;
+            margin: 16px 0;
+            box-shadow: 0 2px 6px rgba(0, 0, 0, 0.03);
+        }
+
         /* ── Tracked AR Overlay ── */
         .ar-overlay {
             position: fixed;
@@ -1152,8 +1331,7 @@
         <!-- ── Top Header ── -->
         <header class="header">
             <button class="brand" onclick="navigate('camera')" aria-label="أثرنا — الصفحة الرئيسية">
-                <span class="brand-symbol" aria-hidden="true"><i></i><i></i><i></i></span>
-                <span class="wordmark">أثرنا<small>ATHARNA</small></span>
+                <img src="/static/images/Atharna-logo.png" alt="أثرنا — Atharna" class="brand-logo-img">
             </button>
 
             <nav class="desktop-links" aria-label="Main navigation" id="desktop-nav"></nav>
@@ -1222,6 +1400,7 @@
             message: '<path d="M21 11.5a8.5 8.5 0 0 1-8.5 8.5H3l2-5A8.5 8.5 0 1 1 21 11.5z"/>',
             bookmark: '<path d="M6 3h12v19l-6-4-6 4z"/>',
             check: '<path d="m5 12 4 4L19 6"/>',
+            feather: '<path d="M20.24 12.24a6 6 0 0 0-8.49-8.49L5 10.5V19h8.5z"/><line x1="16" y1="8" x2="2" y2="22"/><line x1="17.5" y1="15" x2="9" y2="15"/>',
             cube: '<path d="m12 2 9 5v10l-9 5-9-5V7zM3 7l9 5 9-5M12 12v10M7.5 4.5l9 5"/>',
             plus: '<path d="M12 5v14M5 12h14"/>',
             download: '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/>',
@@ -1255,6 +1434,10 @@
         let socket = null;
         let communityPosts = [];
         let userMemories = [];
+        try {
+            const savedMemories = localStorage.getItem('atharna_memories');
+            if (savedMemories) userMemories = JSON.parse(savedMemories);
+        } catch (e) {}
 
         /* ── Internationalization Dictionary ── */
         const T = (ar, en) => currentLang === 'ar' ? ar : en;
@@ -1541,10 +1724,15 @@
                 </div>
 
                 <!-- Action Strip -->
-                <div class="sheet-actions">
+                <div class="sheet-actions" style="flex-wrap: wrap;">
                     <button class="${isStorySaved ? 'active-action' : ''}" onclick="toggleSaveCurrentResult()">
                         ${icon(isStorySaved ? 'check' : 'bookmark')}
                         <span>${isStorySaved ? T('محفوظة', 'Saved') : T('حفظ الحكاية', 'Save')}</span>
+                    </button>
+
+                    <button class="btn-memory-gold" onclick="openAddMemoryModalForObject('${escapeHtml(title)}', '${currentResult.image || uploadedPhotoUrl || ''}')">
+                        ${icon('feather')}
+                        <span>${T('أضف ذكرياتك وأثرك', 'Add Memory & Sign')}</span>
                     </button>
 
                     ${!isIndoor ? `
@@ -1628,6 +1816,64 @@
                             <img src="${currentResult.image}" alt="${title}" style="width:100%;border-radius:8px;border:1px solid var(--line);">
                         </div>
                     ` : ''}
+
+                    <!-- Object-Attached Memories & Handwritten Signature (Next to the Object) -->
+                    ${(() => {
+                        const objMems = userMemories.filter(m => m.object_name === title || m.title === title);
+                        return `
+                            <div class="object-attached-memories" style="margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--line);">
+                                <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+                                    <div>
+                                        <div class="eyebrow" style="margin:0;">${T('أثرك مع هذا المعلم', 'YOUR MARK WITH THIS ARTIFACT')}</div>
+                                        <h3 style="font-size:15px;color:var(--ink);margin:2px 0 0;">${T('ذكرياتي وتوقيعي مع هذا الأثر', 'Memories & Signature')} (${objMems.length})</h3>
+                                    </div>
+                                    <button class="btn-micro-add" onclick="openAddMemoryModalForObject('${escapeHtml(title)}', '${currentResult.image || uploadedPhotoUrl || ''}')" style="display:flex;align-items:center;gap:6px;padding:6px 12px;border-radius:20px;border:1px solid var(--line);background:var(--ink);color:var(--gold);font-size:11px;font-weight:600;cursor:pointer;">
+                                        ${icon('feather')}
+                                        <span>${T('أضف ذكرى / توقيع', 'Add Memory')}</span>
+                                    </button>
+                                </div>
+
+                                ${objMems.length > 0 ? `
+                                    <div style="display:flex;flex-direction:column;gap:12px;">
+                                        ${objMems.map(m => `
+                                            <div class="memory-archival-card">
+                                                <div class="memory-card-media" style="height: 175px;">
+                                                    <img class="memory-photo" src="${m.user_photo || m.artifact_image || currentResult.image || uploadedPhotoUrl || ''}" alt="${m.title}">
+                                                    ${m.handwritten_url ? `
+                                                        <div class="memory-handwritten-overlay">
+                                                            <img src="${m.handwritten_url}" alt="توقيع يدوي">
+                                                        </div>
+                                                        <span class="memory-signature-badge">${icon('feather')} ${T('توقيع باليد', 'Handwritten')}</span>
+                                                    ` : ''}
+                                                </div>
+                                                <div class="memory-card-body">
+                                                    <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                                                        <strong>${escapeHtml(m.object_name || title)}</strong>
+                                                        <small style="color:var(--muted);font-size:11px;">${m.date || ''}</small>
+                                                    </div>
+                                                    ${m.caption ? `<p style="font-size:13px;color:var(--ink);margin:6px 0;">${escapeHtml(m.caption)}</p>` : ''}
+                                                </div>
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                ` : `
+                                    <div class="memory-callout-card">
+                                        <div style="display:flex;align-items:center;gap:12px;">
+                                            <span style="font-size:26px;">🖋️</span>
+                                            <div style="flex:1;">
+                                                <strong style="font-size:13px;color:var(--ink);display:block;">${T('لك أثر في هذا المكان؟', 'Leave your mark here')}</strong>
+                                                <p style="font-size:12px;color:var(--muted);margin:2px 0 0;">${T('أضف صورة زيارتك، تدوينة، أو وقّع بالقلم الرقمي لتظهر ذكراك بجانب هذا الأثر.', 'Add your photo, reflection, or sign with digital pen to record your visit next to this artifact.')}</p>
+                                            </div>
+                                        </div>
+                                        <button class="primary-btn" style="width:100%;margin-top:10px;padding:8px 12px;min-height:38px;background:var(--ink);color:var(--gold);font-weight:600;font-size:12px;cursor:pointer;" onclick="openAddMemoryModalForObject('${escapeHtml(title)}', '${currentResult.image || uploadedPhotoUrl || ''}')">
+                                            ${icon('feather')}
+                                            <span>${T('أضف ذكراك وتوقيعك باليد الآن', 'Add Memory & Sign with Pen')}</span>
+                                        </button>
+                                    </div>
+                                `}
+                            </div>
+                        `;
+                    })()}
 
                     <p class="source-note">
                         ${T('مصدر المعلومات: نظام أثرنا الذكي المتكامل · قاعدة بيانات التراث وموسوعة الذكاء الاصطناعي.', 'Source: Atharna Intelligent Heritage Engine · Verified dataset & AI vision synthesis.')}
@@ -2129,11 +2375,28 @@
                     </div>
 
                     ${userMemories.length ? `
-                        <div class="memory-grid">
+                        <div class="memory-grid" style="grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 18px;">
                             ${userMemories.map(m => `
-                                <div class="memory-item">
-                                    <img src="${m.image}" alt="${m.title || 'Memory'}">
-                                    <span>${escapeHtml(m.title || m.caption || '')}</span>
+                                <div class="memory-archival-card">
+                                    <div class="memory-card-media">
+                                        <img class="memory-photo" src="${m.user_photo || m.artifact_image || m.image || '/static/images/image1.jpeg'}" alt="${m.title || 'Memory'}">
+                                        ${m.handwritten_url ? `
+                                            <div class="memory-handwritten-overlay">
+                                                <img src="${m.handwritten_url}" alt="توقيع يدوي">
+                                            </div>
+                                            <span class="memory-signature-badge">${icon('feather')} ${T('توقيع باليد', 'Handwritten')}</span>
+                                        ` : ''}
+                                    </div>
+                                    <div class="memory-card-body">
+                                        <div style="display:flex;justify-content:space-between;align-items:flex-start;">
+                                            <strong style="font-size:14px;color:var(--ink);">${escapeHtml(m.object_name || m.title || 'أثر مصري')}</strong>
+                                            <small style="color:var(--muted);font-size:11px;">${m.date || ''}</small>
+                                        </div>
+                                        ${m.caption ? `<p style="font-size:13px;color:var(--ink);margin:6px 0;line-height:1.5;">${escapeHtml(m.caption)}</p>` : ''}
+                                        <div class="memory-card-footer">
+                                            <span style="display:flex;align-items:center;gap:4px;">${icon('pin')} ${escapeHtml(m.location_name || T('مصر التراثية', 'Historic Egypt'))}</span>
+                                        </div>
+                                    </div>
                                 </div>
                             `).join('')}
                         </div>
@@ -2258,6 +2521,331 @@
             const host = $id('modal');
             host.hidden = true;
             host.innerHTML = '';
+        }
+
+        /* ══════════════════════════════════════════════════════════════════
+           MEMORY STUDIO: HANDWRITTEN PEN, VISITOR PHOTO & NOTE
+        ══════════════════════════════════════════════════════════════════ */
+        let currentMemoryObjTitle = '';
+        let currentMemoryArtifactImg = '';
+        let memoryVisitorPhotoData = null;
+        let penColor = '#d8b780';
+        let penWidth = 3.5;
+        let isDrawing = false;
+        let lastX = 0, lastY = 0;
+        let hasDrawn = false;
+        let penCanvasHistory = [];
+
+        function openAddMemoryModalForObject(objTitle, artifactImgUrl, initialTab = 'pen') {
+            currentMemoryObjTitle = objTitle || (currentResult?.gemini?.possibleLandmark || currentResult?.suggested_class || getActivePlace().name_ar || 'أثر مصري');
+            currentMemoryArtifactImg = artifactImgUrl || currentResult?.image || uploadedPhotoUrl || getActivePlace().image_url;
+            memoryVisitorPhotoData = null;
+            hasDrawn = false;
+            penCanvasHistory = [];
+
+            const content = `
+                <div style="display:flex;align-items:center;gap:12px;padding:10px;background:#f3e8d9;border-radius:8px;margin-bottom:14px;border:1px solid #e2d2bd;">
+                    <img src="${currentMemoryArtifactImg}" alt="" style="width:50px;height:50px;border-radius:6px;object-fit:cover;border:1px solid var(--line);">
+                    <div>
+                        <span style="font-size:11px;color:var(--muted);">${T('تخليد ذكرى وتوقيع مع الأثر:', 'Record Memory for Artifact:')}</span>
+                        <strong style="display:block;font-size:15px;color:var(--ink);">${escapeHtml(currentMemoryObjTitle)}</strong>
+                    </div>
+                </div>
+
+                <!-- 3 Tab Selectors: Pen, Photo, Note -->
+                <div class="memory-studio-tabs">
+                    <button class="memory-tab-btn active" id="tab-btn-pen" onclick="switchMemoryStudioTab('pen')">
+                        ${icon('feather')} <span>${T('قلم وتوقيع يدوي', 'Handwritten Pen')}</span>
+                    </button>
+                    <button class="memory-tab-btn" id="tab-btn-photo" onclick="switchMemoryStudioTab('photo')">
+                        ${icon('image')} <span>${T('صورة الزيارة', 'Visitor Photo')}</span>
+                    </button>
+                    <button class="memory-tab-btn" id="tab-btn-note" onclick="switchMemoryStudioTab('note')">
+                        ${icon('message')} <span>${T('تدوينة', 'Note')}</span>
+                    </button>
+                </div>
+
+                <!-- Panel 1: Handwritten Digital Pen -->
+                <div id="memory-panel-pen" class="memory-studio-panel">
+                    <p style="font-size:12px;color:var(--muted);margin-bottom:6px;">
+                        ${T('اكتب توقيعك، اسمك، أو كلمة تذكارية بخط يدك بالقلم الرقمي لتظهر بجانب الأثر:', 'Handwrite your signature, name, or dedication to be stamped next to the artifact:')}
+                    </p>
+                    <div class="canvas-container">
+                        <canvas id="handwritten-canvas"></canvas>
+                        <div class="canvas-toolbar">
+                            <!-- Color Swatches -->
+                            <div class="pen-swatches">
+                                <button type="button" class="pen-swatch active" style="background:#d8b780" title="ذهب أثري" onclick="setPenColor('#d8b780', this)"></button>
+                                <button type="button" class="pen-swatch" style="background:#11100e" title="حبر أسود" onclick="setPenColor('#11100e', this)"></button>
+                                <button type="button" class="pen-swatch" style="background:#af7d49" title="نحاس ملكي" onclick="setPenColor('#af7d49', this)"></button>
+                                <button type="button" class="pen-swatch" style="background:#1e3a8a" title="لازورد" onclick="setPenColor('#1e3a8a', this)"></button>
+                            </div>
+
+                            <!-- Pen Sizes -->
+                            <div class="pen-sizes">
+                                <button type="button" class="pen-size-btn" onclick="setPenWidth(1.5, this)">${T('رفيع', 'Fine')}</button>
+                                <button type="button" class="pen-size-btn active" onclick="setPenWidth(3.5, this)">${T('عربي', 'Medium')}</button>
+                                <button type="button" class="pen-size-btn" onclick="setPenWidth(6.0, this)">${T('عريض', 'Broad')}</button>
+                            </div>
+
+                            <!-- Clear -->
+                            <div style="display:flex;gap:6px;">
+                                <button type="button" style="font-size:11px;color:#dc2626;padding:3px 8px;border-radius:4px;border:1px solid #fca5a5;background:#fef2f2;cursor:pointer;" onclick="clearHandwrittenCanvas()">
+                                    ${T('مسح', 'Clear')}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="canvas-hint">${T('✍️ استخدم إصبعك أو قلم الشاشة أو الماوس للكتابة والرسم بحرية', '✍️ Use your finger, stylus, or mouse to draw smoothly')}</div>
+                </div>
+
+                <!-- Panel 2: Visitor Photo -->
+                <div id="memory-panel-photo" class="memory-studio-panel" style="display:none;">
+                    <p style="font-size:12px;color:var(--muted);margin-bottom:8px;">
+                        ${T('التقط صورة لنفسك أو ارفع لقطة من زيارتك بجانب هذا المعلم:', 'Upload a selfie or personal photograph taken with this landmark:')}
+                    </p>
+                    <div style="border:2px dashed var(--line);border-radius:8px;padding:20px;text-align:center;cursor:pointer;background:#fffaf3;" onclick="$id('visitor-photo-input').click()">
+                        <div id="visitor-photo-preview-box">
+                            <span style="font-size:32px;display:block;margin-bottom:6px;">📷</span>
+                            <strong style="font-size:13px;color:var(--ink);">${T('اضغط لاختيار صورة الزيارة', 'Click to choose photo')}</strong>
+                            <small style="display:block;color:var(--muted);font-size:11px;margin-top:2px;">PNG, JPG ${T('حتى 10 ميجابايت', 'up to 10MB')}</small>
+                        </div>
+                    </div>
+                    <input type="file" id="visitor-photo-input" accept="image/*" style="display:none;" onchange="handleVisitorPhotoSelected(event)">
+                </div>
+
+                <!-- Panel 3: Written Note -->
+                <div id="memory-panel-note" class="memory-studio-panel" style="display:none;">
+                    <label for="memory-note-text" style="font-size:12px;font-weight:600;color:var(--ink);">${T('ماذا تحب أن تتذكر عن هذا الأثر؟', 'What would you like to remember about this object?')}</label>
+                    <textarea id="memory-note-text" placeholder="${T('شعورك، اللحظة التي رأيته فيها، أو ذكرى مع من زارك…', 'Your feeling, discovery, or memory of the visit…')}" maxlength="400"></textarea>
+                </div>
+
+                <!-- Optional share to feed checkbox -->
+                <div style="display:flex;align-items:center;gap:8px;margin:14px 0 16px;">
+                    <input type="checkbox" id="share-to-community-chk" checked style="accent-color:var(--bronze);width:16px;height:16px;">
+                    <label for="share-to-community-chk" style="font-size:12px;color:var(--ink);cursor:pointer;">
+                        ${T('مشاركة هذه الذكرى أيضاً في صفحة «حكايات الناس»', 'Also share to Community Visitor Stories')}
+                    </label>
+                </div>
+
+                <button class="primary-btn" style="width:100%;background:linear-gradient(135deg, var(--ink), #2b2217);color:var(--gold);font-weight:700;" onclick="saveMemoryForCurrentObject()">
+                    ${icon('feather')}
+                    <span>${T('احفظ الذكرى بجوار الأثر', 'Save Memory Next to Artifact')}</span>
+                </button>
+            `;
+
+            openModal(T('سجّل أثرك وذكرياتك', 'Add Your Memory & Mark'), content);
+
+            setTimeout(() => {
+                initHandwrittenCanvas();
+                if (initialTab && initialTab !== 'pen') {
+                    switchMemoryStudioTab(initialTab);
+                }
+            }, 60);
+        }
+
+        function switchMemoryStudioTab(tab) {
+            ['pen', 'photo', 'note'].forEach(t => {
+                const btn = $id(`tab-btn-${t}`);
+                const panel = $id(`memory-panel-${t}`);
+                if (btn) btn.classList.toggle('active', t === tab);
+                if (panel) panel.style.display = (t === tab ? 'block' : 'none');
+            });
+            if (tab === 'pen') {
+                setTimeout(resizeCanvasIfNeeded, 30);
+            }
+        }
+
+        function initHandwrittenCanvas() {
+            const canvas = $id('handwritten-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+
+            const rect = canvas.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            canvas.width = rect.width * dpr;
+            canvas.height = (rect.height || 180) * dpr;
+            ctx.scale(dpr, dpr);
+
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.strokeStyle = penColor;
+            ctx.lineWidth = penWidth;
+
+            function getCoords(e) {
+                const r = canvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                return {
+                    x: clientX - r.left,
+                    y: clientY - r.top
+                };
+            }
+
+            function startDraw(e) {
+                e.preventDefault();
+                isDrawing = true;
+                hasDrawn = true;
+                const c = getCoords(e);
+                lastX = c.x;
+                lastY = c.y;
+                ctx.beginPath();
+                ctx.arc(lastX, lastY, penWidth / 2, 0, Math.PI * 2);
+                ctx.fillStyle = penColor;
+                ctx.fill();
+            }
+
+            function draw(e) {
+                if (!isDrawing) return;
+                e.preventDefault();
+                const c = getCoords(e);
+                ctx.beginPath();
+                ctx.strokeStyle = penColor;
+                ctx.lineWidth = penWidth;
+                ctx.moveTo(lastX, lastY);
+                const midX = (lastX + c.x) / 2;
+                const midY = (lastY + c.y) / 2;
+                ctx.quadraticCurveTo(lastX, lastY, midX, midY);
+                ctx.stroke();
+                lastX = c.x;
+                lastY = c.y;
+            }
+
+            function stopDraw(e) {
+                if (isDrawing) {
+                    isDrawing = false;
+                }
+            }
+
+            canvas.addEventListener('pointerdown', startDraw);
+            canvas.addEventListener('pointermove', draw);
+            canvas.addEventListener('pointerup', stopDraw);
+            canvas.addEventListener('pointercancel', stopDraw);
+            canvas.addEventListener('pointerleave', stopDraw);
+        }
+
+        function resizeCanvasIfNeeded() {
+            const canvas = $id('handwritten-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            const rect = canvas.getBoundingClientRect();
+            if (rect.width > 0 && canvas.width !== rect.width * (window.devicePixelRatio || 1)) {
+                const temp = canvas.toDataURL();
+                const dpr = window.devicePixelRatio || 1;
+                canvas.width = rect.width * dpr;
+                canvas.height = (rect.height || 180) * dpr;
+                ctx.scale(dpr, dpr);
+                ctx.lineCap = 'round';
+                ctx.lineJoin = 'round';
+                const img = new Image();
+                img.onload = () => ctx.drawImage(img, 0, 0, rect.width, rect.height);
+                img.src = temp;
+            }
+        }
+
+        function setPenColor(color, el) {
+            penColor = color;
+            document.querySelectorAll('.pen-swatch').forEach(s => s.classList.remove('active'));
+            if (el) el.classList.add('active');
+        }
+
+        function setPenWidth(w, el) {
+            penWidth = w;
+            document.querySelectorAll('.pen-size-btn').forEach(b => b.classList.remove('active'));
+            if (el) el.classList.add('active');
+        }
+
+        function clearHandwrittenCanvas() {
+            const canvas = $id('handwritten-canvas');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            hasDrawn = false;
+        }
+
+        function handleVisitorPhotoSelected(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = ev => {
+                memoryVisitorPhotoData = ev.target.result;
+                const box = $id('visitor-photo-preview-box');
+                if (box) {
+                    box.innerHTML = `
+                        <img src="${memoryVisitorPhotoData}" alt="Visitor Photo" style="max-height:160px;width:100%;object-fit:cover;border-radius:6px;">
+                        <button type="button" style="margin-top:8px;font-size:11px;color:#dc2626;background:none;border:none;cursor:pointer;" onclick="event.stopPropagation();memoryVisitorPhotoData=null;switchMemoryStudioTab('photo');">
+                            ${T('إلغاء الصورة', 'Remove photo')}
+                        </button>
+                    `;
+                }
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function saveMemoryForCurrentObject() {
+            const canvas = $id('handwritten-canvas');
+            let handwrittenUrl = null;
+            if (canvas && hasDrawn) {
+                handwrittenUrl = canvas.toDataURL('image/png');
+            }
+
+            const noteTextarea = $id('memory-note-text');
+            const noteText = noteTextarea ? noteTextarea.value.trim() : '';
+
+            if (!handwrittenUrl && !memoryVisitorPhotoData && !noteText) {
+                showToast(T('يرجى كتابة توقيع بالقلم أو إضافة صورة أو تدوينة أولاً.', 'Please handwrite with pen, add a photo, or write a note first.'));
+                return;
+            }
+
+            const curPlace = getActivePlace();
+            const newMemory = {
+                id: 'mem_' + Date.now(),
+                object_name: currentMemoryObjTitle,
+                title: currentMemoryObjTitle,
+                location_id: currentResult?.object?.location_id || curPlace.location_id || 'L003',
+                location_name: T(curPlace.name_ar || curPlace.name, curPlace.name),
+                artifact_image: currentMemoryArtifactImg,
+                user_photo: memoryVisitorPhotoData,
+                handwritten_url: handwrittenUrl,
+                caption: noteText,
+                date: new Date().toLocaleDateString(currentLang === 'ar' ? 'ar-EG' : 'en-US', {
+                    year: 'numeric',
+                    month: 'long',
+                    day: 'numeric'
+                }),
+                createdAt: new Date().toISOString()
+            };
+
+            userMemories.unshift(newMemory);
+            try {
+                localStorage.setItem('atharna_memories', JSON.stringify(userMemories));
+            } catch (e) {}
+
+            // Share to community feed if selected
+            const shareChk = $id('share-to-community-chk');
+            if (shareChk && shareChk.checked) {
+                try {
+                    const postPayload = {
+                        content: noteText || T('ذكرى وتوقيع زيارة موثق بخط اليد مع الأثر.', 'Handwritten visit memory recorded with the artifact.'),
+                        author: T('زائر أثرنا', 'Atharna Visitor'),
+                        object_id: currentResult?.object?.object_id || 'O001',
+                        location_id: newMemory.location_id,
+                        location_name: newMemory.location_name,
+                        image_url: memoryVisitorPhotoData || handwrittenUrl || currentMemoryArtifactImg
+                    };
+                    fetch('/api/posts', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(postPayload)
+                    }).then(r => r.json()).then(data => {
+                        if (data.post) communityPosts.unshift(data.post);
+                    }).catch(() => {});
+                } catch (e) {}
+            }
+
+            closeModal();
+            showToast(T('تم حفظ ذكرى وتوقيع زيارتك بجوار هذا الأثر بنجاح! ✨', 'Your memory and signature have been saved next to this artifact! ✨'));
+            renderWorkspace();
         }
 
         /* ══════════════════════════════════════════════════════════════════
