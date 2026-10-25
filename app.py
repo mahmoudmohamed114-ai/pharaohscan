@@ -235,8 +235,13 @@ except Exception as e:
         "training_candidates": MockCollection([])
     })
 
-# ─── Load YOLO Models (Memory-Optimized: ONLY YOLOv11) ──────────────────────
-from ultralytics import YOLO
+# ─── Load YOLO Models (Memory-Optimized: ONLY on local machines with sufficient RAM) ────
+is_cloud_restricted = bool(
+    os.environ.get("RAILWAY_ENVIRONMENT") or
+    os.environ.get("RAILWAY_SERVICE_ID") or
+    os.environ.get("RAILWAY_PROJECT_ID") or
+    os.environ.get("DISABLE_YOLO_ON_CLOUD") == "1"
+)
 
 colab_y11_path = "models/yolo11_best.pt"
 local_y11_path = "models/yolo11n.pt"
@@ -257,16 +262,26 @@ else:
 model_path_v8 = model_path_y11
 is_custom_yolov8 = is_custom_yolo11
 
-print(f"[INFO] Single YOLO11 model configured: {model_path_y11} (custom={is_custom_yolo11})")
+if is_cloud_restricted:
+    print("[INFO] Cloud environment detected (Railway Starter 512MB RAM ceiling). Ultralytics PyTorch disabled to prevent OOM SIGKILL. Using Gemini Vision + OpenCV Adaptive Instance Segmentation.")
+else:
+    print(f"[INFO] Single YOLO11 model configured: {model_path_y11} (custom={is_custom_yolo11})")
 
 # ── Lazy singletons ──────────────────────────────────────────────────────────
 _yolo_y11 = None
 
 def get_yolo_y11():
     global _yolo_y11
+    if is_cloud_restricted:
+        return None
     if _yolo_y11 is None:
-        print(f"[INFO] Loading YOLO11 model into memory: {model_path_y11}")
-        _yolo_y11 = YOLO(model_path_y11)
+        try:
+            from ultralytics import YOLO
+            print(f"[INFO] Loading YOLO11 model into memory: {model_path_y11}")
+            _yolo_y11 = YOLO(model_path_y11)
+        except Exception as e:
+            print(f"[WARNING] Could not load YOLO11: {e}")
+            return None
     return _yolo_y11
 
 def get_yolo_v8():
@@ -274,7 +289,7 @@ def get_yolo_v8():
     return get_yolo_y11()
 
 def get_yolo_world():
-    # Disabled to save 500MB+ RAM on 1GB instances
+    # Disabled to save 500MB+ RAM on cloud instances
     return None
 
 # ─── Geohash Utility (Pure Python, 100% self-contained) ────────────────────────
@@ -428,6 +443,8 @@ Return ONLY a valid JSON object — no markdown fences, no extra text:
 {{
   "description": "Detailed visual description of what is shown in the image",
   "possibleLandmark": "Name of the identified landmark or artifact",
+  "sceneType": "indoor",
+  "isArtifact": true,
   "isNewLandmark": false,
   "confidence": 85,
   "reason": "Brief explanation supporting your identification",
@@ -436,6 +453,8 @@ Return ONLY a valid JSON object — no markdown fences, no extra text:
 }}
 
 confidence must be an integer from 0 to 100.
+sceneType must be strictly either "indoor" or "outdoor".
+isArtifact must be true for museum items/jewelry/antiquities, and false for architectural landmarks/monuments.
 latitude and longitude must be real decimal numbers (e.g. 48.8584, 2.2945) or null if unknown."""
 
     b64_data = base64.b64encode(image_bytes).decode('utf-8')
@@ -1642,7 +1661,7 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                     'posts': serialize_mongo(posts)
                 }
 
-        # 2. Run standard YOLO model prediction
+        # 2. Run standard YOLO model prediction (only on environments with sufficient RAM)
         BACKGROUND_NOISE_CLASSES = {
             'car', 'truck', 'bus', 'person', 'bicycle', 'motorcycle', 'traffic light', 
             'stop sign', 'bench', 'parking meter', 'dog', 'cat', 'airplane', 'train', 
@@ -1650,35 +1669,46 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
             'potted plant', 'bed', 'dining table', 'tv', 'laptop', 'cell phone'
         }
 
-        active_model = get_yolo_y11() if model_type == 'v11' else get_yolo_v8()
-        results = active_model.predict(source=img, save=False, verbose=False)
-        inference_time = (time.time() - t0) * 1000
-        result = results[0]
-        
+        is_cloud_restricted = bool(
+            os.environ.get("RAILWAY_ENVIRONMENT") or
+            os.environ.get("RAILWAY_SERVICE_ID") or
+            os.environ.get("RAILWAY_PROJECT_ID") or
+            os.environ.get("DISABLE_YOLO_ON_CLOUD") == "1"
+        )
+
         has_custom_detection = False
         detections = []
         valid_boxes = []
 
-        for box in result.boxes:
-            conf = float(box.conf[0])
-            if is_demo_active:
-                conf = max(0.01, min(0.99, conf + random.uniform(-0.02, 0.03)))
-            if conf >= threshold:
-                cls_id = int(box.cls[0])
-                name = result.names[cls_id]
-                name_lower = name.lower().strip()
-                
-                # Filter out standard COCO background noise if not using custom-trained landmark model
-                if not is_custom_active and name_lower in BACKGROUND_NOISE_CLASSES:
-                    print(f"[NOISE-FILTER] Ignoring background COCO noise detection: '{name}' ({conf:.2%})")
-                    continue
+        if not is_cloud_restricted:
+            try:
+                active_model = get_yolo_y11() if model_type == 'v11' else get_yolo_v8()
+                results = active_model.predict(source=img, save=False, verbose=False)
+                inference_time = (time.time() - t0) * 1000
+                result = results[0]
 
-                has_custom_detection = True
-                valid_boxes.append(box)
-                detections.append({
-                    'class': name,
-                    'confidence': f"{conf:.2%}"
-                })
+                for box in result.boxes:
+                    conf = float(box.conf[0])
+                    if is_demo_active:
+                        conf = max(0.01, min(0.99, conf + random.uniform(-0.02, 0.03)))
+                    if conf >= threshold:
+                        cls_id = int(box.cls[0])
+                        name = result.names[cls_id]
+                        name_lower = name.lower().strip()
+                        
+                        # Filter out standard COCO background noise if not using custom-trained landmark model
+                        if not is_custom_active and name_lower in BACKGROUND_NOISE_CLASSES:
+                            print(f"[NOISE-FILTER] Ignoring background COCO noise detection: '{name}' ({conf:.2%})")
+                            continue
+
+                        has_custom_detection = True
+                        valid_boxes.append(box)
+                        detections.append({
+                            'class': name,
+                            'confidence': f"{conf:.2%}"
+                        })
+            except Exception as y_err:
+                print(f"[WARNING] Local YOLO prediction error: {y_err}")
                 
         if has_custom_detection and valid_boxes:
             # Match highest confidence valid landmark detection with database
@@ -1904,6 +1934,50 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
         nearby_landmarks_str = "\n".join([f"  - {o}" for o in nearby_objs])
 
         gemini_res = analyze_with_gemini(file_bytes, mimetype, nearby_landmarks_str)
+
+        # ── Smart Pipeline Auto-Router Branch A: Indoor Museum Artifact ─────────────────
+        if is_indoor_artifact(gemini_res, filename):
+            print(f"[AUTO-ROUTER] [GEM] Gemini classified '{filename}' as an Indoor Museum Artifact / Jewelry piece! Executing Artifact Segmentation Pipeline...")
+            try:
+                pipeline = get_artifact_pipeline()
+                output_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), "outputs"))
+                seg_res = pipeline.process_image(img, output_dir=output_dir)
+
+                with open(seg_res["detection_path"], "rb") as f:
+                    det_b64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode('utf-8')
+
+                with open(seg_res["segmentation_path"], "rb") as f:
+                    seg_b64 = "data:image/jpeg;base64," + base64.b64encode(f.read()).decode('utf-8')
+
+                items_enhanced = []
+                for item in seg_res["results"]["items"]:
+                    obj_path = os.path.join(output_dir, item["segmented_image"])
+                    item_data = dict(item)
+                    item_data["url"] = f"/outputs/{item['segmented_image']}"
+                    if os.path.exists(obj_path):
+                        with open(obj_path, "rb") as of:
+                            item_data["image_base64"] = "data:image/png;base64," + base64.b64encode(of.read()).decode('utf-8')
+                    items_enhanced.append(item_data)
+
+                landmark_label = gemini_res.get("possibleLandmark")
+                label_txt = f" ({landmark_label})" if landmark_label and landmark_label != "Unknown" else ""
+
+                return {
+                    'pipeline': 'artifact_segmentation',
+                    'scene_type': 'indoor',
+                    'success': True,
+                    'detection_image': det_b64,
+                    'segmentation_image': seg_b64,
+                    'items': items_enhanced,
+                    'results_json': seg_res["results"],
+                    'num_items': len(items_enhanced),
+                    'gemini': gemini_res,
+                    'router_msg': f"💎 AI Auto-Detected: Indoor Museum Artifact{label_txt} → Artifact Segmentation Pipeline Executed"
+                }
+            except Exception as seg_err:
+                print(f"[WARNING] Artifact segmentation pipeline failed: {seg_err}, falling back to landmark pipeline")
+
+        # ── Smart Pipeline Branch B: Outdoor Heritage Landmark ──────────────────────────
         suggested_landmark = gemini_res.get("possibleLandmark", "Unknown")
         description = gemini_res.get("description", "")
         confidence_val = gemini_res.get("confidence", 80) / 100.0
@@ -2081,7 +2155,13 @@ def api_compare():
         
         # Predict YOLOv8 (lazy load)
         t0 = time.time()
-        res_v8 = get_yolo_v8().predict(source=img, save=False, verbose=False)[0]
+        y8 = get_yolo_v8()
+        if y8 is None:
+            return jsonify({
+                'yolov8': {'image': '', 'detections': [], 'inference_time': '0.0ms', 'is_custom': False},
+                'yolo11': {'image': '', 'detections': [], 'inference_time': '0.0ms', 'is_custom': False, 'is_demo': False}
+            })
+        res_v8 = y8.predict(source=img, save=False, verbose=False)[0]
         time_v8 = (time.time() - t0) * 1000
         
         annotated_v8 = res_v8.plot()
