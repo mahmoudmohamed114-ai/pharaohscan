@@ -2196,7 +2196,7 @@
                         <div class="places-grid">
                             ${filteredLocations.map(p => `
                                 <button class="place-card" onclick="selectPlaceAndScan('${p.location_id}')">
-                                    <img src="${p.image_url}" alt="${T(p.name_ar || p.name, p.name)}">
+                                    <img src="${p.image_url}" alt="" loading="lazy" onerror="this.onerror=null;this.src='/static/images/image1.jpeg';">
                                     <div class="place-copy">
                                         <p>${T(p.tag_ar || '', p.tag_en || '')}</p>
                                         <h2>${T(p.name_ar || p.name, p.name)}</h2>
@@ -2216,7 +2216,7 @@
                             <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:16px;">
                                 ${filteredObjects.map(obj => `
                                     <button class="place-card" style="min-height:220px;" onclick="selectObjectAndScan('${obj.object_id}')">
-                                        <img src="${obj.image_url}" alt="${T(obj.name_ar || obj.name, obj.name)}">
+                                        <img src="${obj.image_url}" alt="" loading="lazy" onerror="this.onerror=null;this.src='/static/images/image1.jpeg';">
                                         <div class="place-copy">
                                             <p>${T(obj.name_ar ? 'أثر موثّق' : 'Verified Artifact', 'Verified Artifact')}</p>
                                             <h2 style="font-size:18px;">${T(obj.name_ar || obj.name, obj.name)}</h2>
@@ -2257,9 +2257,22 @@
             }
             uploadedPhotoUrl = obj.image_url || null;
             currentPhotoBlob = null;
-            isResultOpen = false;
+            
+            const matchedLoc = databaseLocations.find(l => l.location_id === obj.location_id) || getActivePlace();
+            currentResult = {
+                status: 'success',
+                success: true,
+                pipeline: (obj.location_id === 'L002' || obj.category === 'museum') ? 'artifact_segmentation' : 'landmark_detection',
+                object: obj,
+                suggested_class: obj.name,
+                image: obj.image_url,
+                description: obj.description_ar || obj.description,
+                confidence_val: 0.99,
+                location: matchedLoc
+            };
+            isResultOpen = true;
             navigate('camera');
-            showToast(T('تم تحديد الأثر: ', 'Selected artifact: ') + T(obj.name_ar || obj.name, obj.name));
+            showToast(T('توثيق وحكاية: ', 'Artifact & Story: ') + T(obj.name_ar || obj.name, obj.name));
         }
 
         /* ══════════════════════════════════════════════════════════════════
