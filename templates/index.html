@@ -773,7 +773,7 @@
 
         .places-grid {
             display: grid;
-            grid-template-columns: 1.3fr 1fr;
+            grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
             gap: 20px;
         }
 
@@ -1034,17 +1034,28 @@
         .choice-btn {
             display: flex;
             align-items: center;
-            gap: 12px;
+            gap: 14px;
             width: 100%;
-            padding: 12px 0;
+            padding: 10px 12px;
+            border-radius: 8px;
+            border: 1px solid transparent;
             border-bottom: 1px solid var(--line);
             text-align: start;
+            transition: all 0.2s;
+        }
+        .choice-btn:hover {
+            background: rgba(175, 125, 73, 0.08);
+        }
+        .choice-btn.active {
+            background: rgba(175, 125, 73, 0.15);
+            border-color: var(--bronze);
         }
         .choice-btn img {
             height: 54px;
             width: 54px;
             object-fit: cover;
             border-radius: 6px;
+            flex-shrink: 0;
         }
 
         /* ── Tracked AR Overlay ── */
@@ -1223,7 +1234,7 @@
         /* ── State Management ── */
         let currentLang = localStorage.getItem('atharna_lang') || 'ar';
         let currentView = 'camera';
-        let activePlaceKey = 'cairo';
+        let activePlaceKey = 'L003';
         let currentResult = null;
         let isResultOpen = false;
         let resultActiveTab = 'place';
@@ -1248,32 +1259,86 @@
         /* ── Internationalization Dictionary ── */
         const T = (ar, en) => currentLang === 'ar' ? ar : en;
 
-        const CURATED_PLACES = {
-            cairo: {
-                key: 'cairo',
-                image: '/static/images/image30.jpeg',
-                name: ['القاهرة التاريخية', 'Historic Cairo'],
-                tag: ['عمارة وتراث إسلامي', 'Islamic Heritage & Architecture'],
-                text: ['تأمّل تفاصيل العمارة والزخارف المملوكية والفاطمية، وافتح حكايات الناس وتاريخ المكان.', 'Explore the intricate Mamluk and Fatimid architecture, and discover stories left across centuries.'],
-                lat: 30.0444, lng: 31.2357
+        /* ── Dynamic Database Locations & Objects ── */
+        let databaseLocations = [
+            {
+                location_id: 'L003',
+                name: 'Historic Cairo',
+                name_ar: 'القاهرة التاريخية وشارع المعز',
+                category: 'arch',
+                tag_ar: 'عمارة وتراث إسلامي',
+                tag_en: 'Islamic Heritage & Architecture',
+                description_ar: 'أكبر متحف مفتوح للآثار الإسلامية في العالم، يزخر بالمساجد والمدارس والوكالات المملوكية والفاطمية الفريدة.',
+                image_url: '/static/images/image30.jpeg',
+                latitude: 30.0444,
+                longitude: 31.2358
             },
-            museum: {
-                key: 'museum',
-                image: '/static/images/image10.jpeg',
-                name: ['المتحف ومجموعات الحُلي', 'Museum Jewelry & Antiquities'],
-                tag: ['مقتنيات أثرية ومجوهرات', 'Royal Artifacts & Jewelry'],
-                text: ['مقتنيات ذهبية وتفاصيل دقيقة من مقابر الفراعنة والملوك. اضغط على أي قطعة لاستكشاف تقطيعها وتاريخها.', 'Exquisite gold ornaments and precious antiquities from royal dynasties. Tap items to explore detail & provenance.'],
-                lat: 30.0478, lng: 31.2336
+            {
+                location_id: 'L002',
+                name: 'Egyptian Museum',
+                name_ar: 'المتحف المصري ومجموعات الحُلي',
+                category: 'museum',
+                tag_ar: 'مقتنيات أثرية ومجوهرات ملكية',
+                tag_en: 'Royal Artifacts & Jewelry',
+                description_ar: 'يضم أندر كنوز الحضارة المصرية القديمة ومجموعات الحُلي الذهبية وقناع توت عنخ آمون الأيقوني.',
+                image_url: '/static/images/image10.jpeg',
+                latitude: 30.0478,
+                longitude: 31.2336
             },
-            giza: {
-                key: 'giza',
-                image: '/static/images/image1.jpeg',
-                name: ['هضبة الجيزة والأهرامات', 'Giza Plateau & Pyramids'],
-                tag: ['عجائب العالم القديم', 'Wonders of the Ancient World'],
-                text: ['الأهرامات الثلاثة وأبو الهول، صروح خالدة تحكي تاريخ الملوك والمهندسين عبر آلاف السنين.', 'The Great Pyramids and the Sphinx, timeless stone monuments telling the stories of builders and kings.'],
-                lat: 29.9792, lng: 31.1342
+            {
+                location_id: 'L001',
+                name: 'Giza Pyramids',
+                name_ar: 'هضبة الجيزة والأهرامات',
+                category: 'landmarks',
+                tag_ar: 'عجائب العالم القديم',
+                tag_en: 'Ancient World Wonders',
+                description_ar: 'الأهرامات الثلاثة الخالدة وأبو الهول على هضبة الجيزة، من أعظم إنجازات الهندسة في التاريخ الإنساني.',
+                image_url: '/static/images/image1.jpeg',
+                latitude: 29.9792,
+                longitude: 31.1342
+            },
+            {
+                location_id: 'L004',
+                name: 'Karnak & Luxor Temples',
+                name_ar: 'معابد الكرنك والأقصر',
+                category: 'landmarks',
+                tag_ar: 'أعظم دور العبادة القديمة',
+                tag_en: 'Ancient Theban Temples',
+                description_ar: 'أعمدة بهو الأساطين الشاهقة وطريق الكباش، عاصمة مصر القديمة طيبة ومجد الملوك الفراعنة.',
+                image_url: '/static/images/image18.jpeg',
+                latitude: 25.7188,
+                longitude: 32.6573
+            },
+            {
+                location_id: 'L_5D8634',
+                name: 'Tahrir Square & Downtown',
+                name_ar: 'ميدان التحرير ووسط البلد',
+                category: 'landmarks',
+                tag_ar: 'قلب القاهرة وتراثها المعماري',
+                tag_en: 'Heart of Historic Cairo',
+                description_ar: 'ميدان التحرير العريق والمتحف المصري ومباني وسط البلد ذات الطابع المعماري الأوروبي الكلاسيكي.',
+                image_url: '/static/images/image14.jpeg',
+                latitude: 30.0444,
+                longitude: 31.2358
             }
-        };
+        ];
+
+        let databaseObjects = [];
+
+        function getActivePlace() {
+            const found = databaseLocations.find(l => l.location_id === activePlaceKey);
+            if (found) return found;
+            return databaseLocations[0] || {
+                location_id: 'L003',
+                name: 'Historic Cairo',
+                name_ar: 'القاهرة التاريخية',
+                tag_ar: 'عمارة وتراث إسلامي',
+                tag_en: 'Islamic Heritage & Architecture',
+                image_url: '/static/images/image30.jpeg',
+                latitude: 30.0444,
+                longitude: 31.2358
+            };
+        }
 
         /* ── Navigation Shell Render ── */
         function renderNav() {
@@ -1296,8 +1361,8 @@
             $id('desktop-nav').innerHTML = html;
             $id('mobile-nav').innerHTML = html;
 
-            const placeObj = CURATED_PLACES[activePlaceKey] || CURATED_PLACES.cairo;
-            $id('place-context-name').textContent = T(placeObj.name[0], placeObj.name[1]);
+            const placeObj = getActivePlace();
+            $id('place-context-name').textContent = T(placeObj.name_ar || placeObj.name, placeObj.name);
             $id('lang-switch-btn').textContent = currentLang === 'ar' ? 'EN' : 'عربي';
 
             document.documentElement.lang = currentLang;
@@ -1346,8 +1411,8 @@
            DESTINATION 1: CAMERA WORKSPACE (HOME)
         ══════════════════════════════════════════════════════════════════ */
         function renderCameraView() {
-            const place = CURATED_PLACES[activePlaceKey] || CURATED_PLACES.cairo;
-            const bgImage = uploadedPhotoUrl || place.image;
+            const place = getActivePlace();
+            const bgImage = uploadedPhotoUrl || place.image_url;
 
             return `
                 <div class="camera-layout ${isResultOpen ? 'result-open' : ''}">
@@ -1617,7 +1682,7 @@
                 userMemories.unshift({
                     id: Date.now(),
                     title: title,
-                    image: currentResult.image || uploadedPhotoUrl || CURATED_PLACES[activePlaceKey].image,
+                    image: currentResult.image || uploadedPhotoUrl || getActivePlace().image_url,
                     caption: currentResult.description || 'Saved Atharna story.',
                     date: new Date().toLocaleDateString()
                 });
@@ -1747,11 +1812,12 @@
             const shutter = $id('shutter-btn');
             if (shutter) shutter.classList.add('scanning');
 
-            const place = CURATED_PLACES[activePlaceKey] || CURATED_PLACES.cairo;
+            const place = getActivePlace();
             const formData = new FormData();
             formData.append('image', fileBlob, filename);
-            formData.append('lat', place.lat);
-            formData.append('lng', place.lng);
+            formData.append('lat', place.latitude || 30.0444);
+            formData.append('lng', place.longitude || 31.2358);
+            formData.append('location_id', place.location_id || 'L003');
             formData.append('model_type', 'v11');
 
             try {
@@ -1852,10 +1918,25 @@
         }
 
         /* ══════════════════════════════════════════════════════════════════
-           DESTINATION 2: DISCOVER (EXPLORE PLACES)
+           DESTINATION 2: DISCOVER (EXPLORE PLACES & OBJECTS FROM DB)
         ══════════════════════════════════════════════════════════════════ */
         function renderDiscoverView() {
-            const places = Object.values(CURATED_PLACES);
+            const filteredLocations = databaseLocations.filter(p => {
+                if (activeFilter === 'all') return true;
+                if (activeFilter === 'arch') return p.category === 'arch';
+                if (activeFilter === 'museum') return p.category === 'museum';
+                if (activeFilter === 'landmarks') return p.category === 'landmarks';
+                return true;
+            });
+
+            const filteredObjects = databaseObjects.filter(o => {
+                if (activeFilter === 'all') return true;
+                if (activeFilter === 'arch') return o.category === 'arch';
+                if (activeFilter === 'museum') return o.category === 'museum';
+                if (activeFilter === 'landmarks') return o.category === 'landmarks';
+                return true;
+            });
+
             return `
                 <section class="page">
                     <div class="page-head">
@@ -1880,20 +1961,47 @@
                         `).join('')}
                     </div>
 
-                    <!-- Places Grid -->
-                    <div class="places-grid">
-                        ${places.map(p => `
-                            <button class="place-card" onclick="selectPlaceAndScan('${p.key}')">
-                                <img src="${p.image}" alt="${T(p.name[0], p.name[1])}">
-                                <div class="place-copy">
-                                    <p>${T(p.tag[0], p.tag[1])}</p>
-                                    <h2>${T(p.name[0], p.name[1])}</h2>
-                                </div>
-                            </button>
-                        `).join('')}
+                    <!-- Section 1: Heritage Destinations from Database -->
+                    <div style="margin-bottom: 32px;">
+                        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                            <h2 style="font-size:18px;font-weight:700;color:var(--ink);">${T('وجهات ومواقع الزيارة', 'Heritage Destinations')}</h2>
+                            <span style="font-size:12px;color:var(--muted);">${filteredLocations.length} ${T('وجهات مسجلة', 'destinations')}</span>
+                        </div>
+                        <div class="places-grid">
+                            ${filteredLocations.map(p => `
+                                <button class="place-card" onclick="selectPlaceAndScan('${p.location_id}')">
+                                    <img src="${p.image_url}" alt="${T(p.name_ar || p.name, p.name)}">
+                                    <div class="place-copy">
+                                        <p>${T(p.tag_ar || '', p.tag_en || '')}</p>
+                                        <h2>${T(p.name_ar || p.name, p.name)}</h2>
+                                    </div>
+                                </button>
+                            `).join('')}
+                        </div>
                     </div>
 
-                    <p class="source-note" style="margin-top:24px;">
+                    <!-- Section 2: Artifacts & Highlights from Database -->
+                    ${filteredObjects.length > 0 ? `
+                        <div style="margin-top: 36px; margin-bottom: 24px;">
+                            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;">
+                                <h2 style="font-size:18px;font-weight:700;color:var(--ink);">${T('مقتنيات ومعالم منتقاة', 'Curated Objects & Antiquities')}</h2>
+                                <span style="font-size:12px;color:var(--muted);">${filteredObjects.length} ${T('قطع مسجلة', 'artifacts')}</span>
+                            </div>
+                            <div style="display:grid;grid-template-columns:repeat(auto-fill, minmax(240px, 1fr));gap:16px;">
+                                ${filteredObjects.map(obj => `
+                                    <button class="place-card" style="min-height:220px;" onclick="selectObjectAndScan('${obj.object_id}')">
+                                        <img src="${obj.image_url}" alt="${T(obj.name_ar || obj.name, obj.name)}">
+                                        <div class="place-copy">
+                                            <p>${T(obj.name_ar ? 'أثر موثّق' : 'Verified Artifact', 'Verified Artifact')}</p>
+                                            <h2 style="font-size:18px;">${T(obj.name_ar || obj.name, obj.name)}</h2>
+                                        </div>
+                                    </button>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <p class="source-note" style="margin-top:28px;">
                         ${T('المعالم والمقتنيات مسترجعة من قاعدة بيانات أثرنا للتراث المصري.', 'Landmarks and collections retrieved from Atharna Egyptian Heritage Database.')}
                     </p>
                 </section>
@@ -1905,14 +2013,27 @@
             renderWorkspace();
         }
 
-        function selectPlaceAndScan(key) {
-            activePlaceKey = key;
+        function selectPlaceAndScan(locId) {
+            activePlaceKey = locId;
             uploadedPhotoUrl = null;
             currentPhotoBlob = null;
             isResultOpen = false;
             navigate('camera');
-            const place = CURATED_PLACES[key];
-            showToast(T('تم تحديد المشهد: ', 'Selected destination: ') + T(place.name[0], place.name[1]));
+            const place = getActivePlace();
+            showToast(T('تم تحديد الوجهة: ', 'Selected destination: ') + T(place.name_ar || place.name, place.name));
+        }
+
+        function selectObjectAndScan(objId) {
+            const obj = databaseObjects.find(o => o.object_id === objId);
+            if (!obj) return;
+            if (obj.location_id) {
+                activePlaceKey = obj.location_id;
+            }
+            uploadedPhotoUrl = obj.image_url || null;
+            currentPhotoBlob = null;
+            isResultOpen = false;
+            navigate('camera');
+            showToast(T('تم تحديد الأثر: ', 'Selected artifact: ') + T(obj.name_ar || obj.name, obj.name));
         }
 
         /* ══════════════════════════════════════════════════════════════════
@@ -2037,19 +2158,20 @@
            MODALS & DIALOGS
         ══════════════════════════════════════════════════════════════════ */
         function openPlaceSelector() {
-            const places = Object.values(CURATED_PLACES);
+            const places = databaseLocations;
             const content = `
                 <p style="font-size:13px;color:var(--muted);margin-bottom:16px;">
                     ${T('اختر وجهتك الحالية لتوجيه البحث والتعرف الجغرافي:', 'Select your destination to optimize local heritage recognition:')}
                 </p>
-                <div>
+                <div style="display:flex;flex-direction:column;gap:8px;">
                     ${places.map(p => `
-                        <button class="choice-btn" onclick="selectPlaceAndScan('${p.key}')">
-                            <img src="${p.image}" alt="">
-                            <div>
-                                <strong style="font-size:13px;color:var(--ink)">${T(p.name[0], p.name[1])}</strong>
-                                <small style="display:block;color:var(--muted);font-size:11px">${T(p.tag[0], p.tag[1])}</small>
+                        <button class="choice-btn ${p.location_id === activePlaceKey ? 'active' : ''}" onclick="selectPlaceAndScan('${p.location_id}')">
+                            <img src="${p.image_url}" alt="${p.name_ar || p.name}">
+                            <div style="flex:1;">
+                                <strong style="font-size:14px;color:var(--ink);display:block;margin-bottom:2px;">${T(p.name_ar || p.name, p.name)}</strong>
+                                <small style="display:block;color:var(--muted);font-size:11px">${T(p.tag_ar || p.tag_en || '', p.tag_en || p.tag_ar || '')}</small>
                             </div>
+                            ${p.location_id === activePlaceKey ? `<span style="color:var(--bronze);font-size:16px;">✓</span>` : ''}
                         </button>
                     `).join('')}
                 </div>
@@ -2058,7 +2180,8 @@
         }
 
         function openStoryComposerForCurrent() {
-            const title = currentResult?.gemini?.possibleLandmark || currentResult?.suggested_class || CURATED_PLACES[activePlaceKey].name[0];
+            const currentLoc = getActivePlace();
+            const title = currentResult?.gemini?.possibleLandmark || currentResult?.suggested_class || (currentLoc.name_ar || currentLoc.name);
             openStoryComposer(title);
         }
 
@@ -2083,13 +2206,14 @@
                 return;
             }
 
+            const curPlace = getActivePlace();
             const postData = {
                 content: text,
                 author: T('زائر أثرنا', 'Atharna Visitor'),
                 object_id: currentResult?.object?.object_id || 'O001',
-                location_id: currentResult?.object?.location_id || 'L001',
-                location_name: attachedObject || T('القاهرة التاريخية', 'Historic Cairo'),
-                image_url: uploadedPhotoUrl || CURATED_PLACES[activePlaceKey].image
+                location_id: currentResult?.object?.location_id || curPlace.location_id || 'L003',
+                location_name: attachedObject || T(curPlace.name_ar || curPlace.name, curPlace.name),
+                image_url: uploadedPhotoUrl || curPlace.image_url
             };
 
             try {
@@ -2201,31 +2325,37 @@
         ══════════════════════════════════════════════════════════════════ */
         async function loadInitialData() {
             try {
-                // Fetch community posts from MongoDB
-                const pRes = await fetch('/api/posts');
-                if (pRes.ok) {
-                    communityPosts = await pRes.json();
+                // Fetch locations, objects, and community posts from MongoDB Atlas
+                const [locsRes, objsRes, postsRes] = await Promise.allSettled([
+                    fetch('/api/locations'),
+                    fetch('/api/objects'),
+                    fetch('/api/posts')
+                ]);
+
+                if (locsRes.status === 'fulfilled' && locsRes.value.ok) {
+                    const fetchedLocs = await locsRes.value.json();
+                    if (Array.isArray(fetchedLocs) && fetchedLocs.length > 0) {
+                        databaseLocations = fetchedLocs;
+                    }
+                }
+
+                if (objsRes.status === 'fulfilled' && objsRes.value.ok) {
+                    const fetchedObjs = await objsRes.value.json();
+                    if (Array.isArray(fetchedObjs) && fetchedObjs.length > 0) {
+                        databaseObjects = fetchedObjs;
+                    }
+                }
+
+                if (postsRes.status === 'fulfilled' && postsRes.value.ok) {
+                    communityPosts = await postsRes.value.json();
                 }
             } catch (e) {
-                console.warn('Initial posts load offline fallback:', e);
-                communityPosts = [
-                    {
-                        post_id: 'P001',
-                        author: 'مريم أحمد',
-                        content: 'جمال العمارة الإسلامية في شارع المعز لا ينتهي.. كل زيارة فيها اكتشاف جديد.',
-                        location_name: 'القاهرة التاريخية',
-                        image_url: '/static/images/image30.jpeg',
-                        createdAt: new Date().toISOString()
-                    },
-                    {
-                        post_id: 'P002',
-                        author: 'عمر شريف',
-                        content: 'الوقوف أمام الهرم الأكبر شعور استثنائي بعظمة الأجداد.',
-                        location_name: 'هضبة الجيزة',
-                        image_url: '/static/images/image1.jpeg',
-                        createdAt: new Date().toISOString()
-                    }
-                ];
+                console.warn('Initial data load fallback:', e);
+            }
+
+            // Ensure activePlaceKey points to a valid destination
+            if (!databaseLocations.some(l => l.location_id === activePlaceKey)) {
+                activePlaceKey = databaseLocations[0]?.location_id || 'L003';
             }
 
             // Socket.IO Real-time Connection

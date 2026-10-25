@@ -2,37 +2,37 @@
   "items": [
     {
       "id": "Item_01",
-      "class": "Pendant",
-      "confidence": 0.89,
+      "class": "Necklace",
+      "confidence": 0.95,
       "bbox": [
-        531,
-        179,
-        710,
-        327
+        135,
+        215,
+        386,
+        340
       ],
       "segmented_image": "objects/Item_01.png"
     },
     {
       "id": "Item_02",
-      "class": "Necklace",
-      "confidence": 0.91,
+      "class": "Beads",
+      "confidence": 0.87,
       "bbox": [
-        136,
-        219,
-        385,
-        339
+        536,
+        201,
+        566,
+        299
       ],
       "segmented_image": "objects/Item_02.png"
     },
     {
       "id": "Item_03",
-      "class": "Pendant",
-      "confidence": 0.89,
+      "class": "Ring",
+      "confidence": 0.94,
       "bbox": [
         389,
-        433,
-        513,
-        518
+        436,
+        512,
+        522
       ],
       "segmented_image": "objects/Item_03.png"
     }
