@@ -22,6 +22,8 @@ egypt-landmarks-3-classes/
 .DS_Store
 Thumbs.db
 
-# ─── IDE ──────────────────────────────────────────────────────────────────────
+# ─── IDE & Backups ────────────────────────────────────────────────────────────
 .vscode/
 .idea/
+*.bak
+redesign_reference/
