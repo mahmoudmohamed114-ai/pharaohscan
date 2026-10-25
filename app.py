@@ -1,5 +1,8 @@
 # ─── Threading & Memory Optimization for Cloud Containers (prevents OOM / SIGKILL) ─
 import os
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning)
+warnings.filterwarnings("ignore", category=DeprecationWarning)
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
 os.environ["OPENBLAS_NUM_THREADS"] = "1"
@@ -11,7 +14,15 @@ os.environ["TORCH_NUM_THREADS"] = "1"
 try:
     import eventlet
     eventlet.monkey_patch()
-except ImportError:
+    
+    import logging
+    class SocketShutdownFilter(logging.Filter):
+        def filter(self, record):
+            msg = record.getMessage()
+            return "Bad file descriptor" not in msg and "socket shutdown error" not in msg
+    logging.getLogger("eventlet.wsgi.server").addFilter(SocketShutdownFilter())
+    logging.getLogger("eventlet.wsgi").addFilter(SocketShutdownFilter())
+except Exception:
     pass  # Local dev without eventlet is fine
 
 import gc
@@ -58,7 +69,15 @@ def uploaded_file(filename):
 def serve_static(filename):
     return send_from_directory(os.path.join(os.path.dirname(__file__), "static"), filename)
 async_mode = "eventlet" if "eventlet" in sys.modules else None
-socketio = SocketIO(app, cors_allowed_origins="*", async_mode=async_mode)
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode=async_mode,
+    ping_timeout=60,
+    ping_interval=25,
+    logger=False,
+    engineio_logger=False
+)
 
 # ─── Configuration ─────────────────────────────────────────────────────────────
 PENDING_DIR = "pending_dataset"
@@ -380,6 +399,9 @@ def haversine_meters(lat1, lng1, lat2, lng2):
     return EARTH_RADIUS_M * c
 
 # ─── Gemini Integration ────────────────────────────────────────────────────────
+import warnings
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.generativeai")
+warnings.filterwarnings("ignore", category=FutureWarning, module="google.api_core")
 import google.generativeai as genai
 
 # Load Gemini key
