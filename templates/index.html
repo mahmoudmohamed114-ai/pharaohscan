@@ -1413,7 +1413,7 @@
         /* ── State Management ── */
         let currentLang = localStorage.getItem('atharna_lang') || 'ar';
         let currentView = 'camera';
-        let activePlaceKey = 'L003';
+        let activePlaceKey = 'L001';
         let currentResult = null;
         let isResultOpen = false;
         let resultActiveTab = 'place';
@@ -1442,84 +1442,44 @@
         /* ── Internationalization Dictionary ── */
         const T = (ar, en) => currentLang === 'ar' ? ar : en;
 
-        /* ── Dynamic Database Locations & Objects ── */
-        let databaseLocations = [
-            {
-                location_id: 'L003',
-                name: 'Historic Cairo',
-                name_ar: 'القاهرة التاريخية وشارع المعز',
-                category: 'arch',
-                tag_ar: 'عمارة وتراث إسلامي',
-                tag_en: 'Islamic Heritage & Architecture',
-                description_ar: 'أكبر متحف مفتوح للآثار الإسلامية في العالم، يزخر بالمساجد والمدارس والوكالات المملوكية والفاطمية الفريدة.',
-                image_url: '/static/images/image30.jpeg',
-                latitude: 30.0444,
-                longitude: 31.2358
-            },
-            {
-                location_id: 'L002',
-                name: 'Egyptian Museum',
-                name_ar: 'المتحف المصري ومجموعات الحُلي',
-                category: 'museum',
-                tag_ar: 'مقتنيات أثرية ومجوهرات ملكية',
-                tag_en: 'Royal Artifacts & Jewelry',
-                description_ar: 'يضم أندر كنوز الحضارة المصرية القديمة ومجموعات الحُلي الذهبية وقناع توت عنخ آمون الأيقوني.',
-                image_url: '/static/images/image10.jpeg',
-                latitude: 30.0478,
-                longitude: 31.2336
-            },
-            {
-                location_id: 'L001',
-                name: 'Giza Pyramids',
-                name_ar: 'هضبة الجيزة والأهرامات',
-                category: 'landmarks',
-                tag_ar: 'عجائب العالم القديم',
-                tag_en: 'Ancient World Wonders',
-                description_ar: 'الأهرامات الثلاثة الخالدة وأبو الهول على هضبة الجيزة، من أعظم إنجازات الهندسة في التاريخ الإنساني.',
-                image_url: '/static/images/image1.jpeg',
-                latitude: 29.9792,
-                longitude: 31.1342
-            },
-            {
-                location_id: 'L004',
-                name: 'Karnak & Luxor Temples',
-                name_ar: 'معابد الكرنك والأقصر',
-                category: 'landmarks',
-                tag_ar: 'أعظم دور العبادة القديمة',
-                tag_en: 'Ancient Theban Temples',
-                description_ar: 'أعمدة بهو الأساطين الشاهقة وطريق الكباش، عاصمة مصر القديمة طيبة ومجد الملوك الفراعنة.',
-                image_url: '/static/images/image18.jpeg',
-                latitude: 25.7188,
-                longitude: 32.6573
-            },
-            {
-                location_id: 'L_5D8634',
-                name: 'Tahrir Square & Downtown',
-                name_ar: 'ميدان التحرير ووسط البلد',
-                category: 'landmarks',
-                tag_ar: 'قلب القاهرة وتراثها المعماري',
-                tag_en: 'Heart of Historic Cairo',
-                description_ar: 'ميدان التحرير العريق والمتحف المصري ومباني وسط البلد ذات الطابع المعماري الأوروبي الكلاسيكي.',
-                image_url: '/static/images/image14.jpeg',
-                latitude: 30.0444,
-                longitude: 31.2358
-            }
-        ];
+        /* ── Dynamic Database Locations & Objects (Loaded 100% from MongoDB Atlas) ── */
+        let databaseLocations = {{ locations_json | safe if locations_json else '[]' }};
+        let databaseObjects = {{ objects_json | safe if objects_json else '[]' }};
 
-        let databaseObjects = [];
+        // Fallback only if offline/mock
+        if (!Array.isArray(databaseLocations) || databaseLocations.length === 0) {
+            databaseLocations = [
+                {
+                    location_id: 'L001',
+                    name: 'Giza Pyramids',
+                    name_ar: 'هضبة الجيزة والأهرامات',
+                    category: 'landmarks',
+                    tag_ar: 'عجائب العالم القديم',
+                    tag_en: 'Ancient World Wonders',
+                    description_ar: 'الأهرامات الثلاثة الخالدة وأبو الهول على هضبة الجيزة، من أعظم إنجازات الهندسة في التاريخ الإنساني.',
+                    image_url: '/static/images/image1.jpeg',
+                    latitude: 29.9792,
+                    longitude: 31.1342
+                }
+            ];
+        }
+
+        if (databaseLocations.length > 0 && !databaseLocations.some(l => l.location_id === activePlaceKey)) {
+            activePlaceKey = databaseLocations[0].location_id;
+        }
 
         function getActivePlace() {
             const found = databaseLocations.find(l => l.location_id === activePlaceKey);
             if (found) return found;
             return databaseLocations[0] || {
-                location_id: 'L003',
-                name: 'Historic Cairo',
-                name_ar: 'القاهرة التاريخية',
-                tag_ar: 'عمارة وتراث إسلامي',
-                tag_en: 'Islamic Heritage & Architecture',
-                image_url: '/static/images/image30.jpeg',
-                latitude: 30.0444,
-                longitude: 31.2358
+                location_id: 'L001',
+                name: 'Giza Pyramids',
+                name_ar: 'هضبة الجيزة والأهرامات',
+                tag_ar: 'عجائب العالم القديم',
+                tag_en: 'Ancient World Wonders',
+                image_url: '/static/images/image1.jpeg',
+                latitude: 29.9792,
+                longitude: 31.1342
             };
         }
 
@@ -1703,19 +1663,39 @@
 
             const isIndoor = currentResult.pipeline === 'artifact_segmentation';
             const gemini = currentResult.gemini || {};
-            const title = gemini.possibleLandmark || currentResult.suggested_class?.replace(/-/g, ' ') || (isIndoor ? T('مقتنيات وحُلي متحفية', 'Museum Artifacts & Jewelry') : T('معلم أثري', 'Heritage Landmark'));
-            const desc = currentResult.description || gemini.description || (isIndoor ? T('تم استخراج وعزل قطع الحُلي والآثار بدقة عالية عبر الذكاء الاصطناعي.', 'Physical artifact instances extracted and segmented via AI.') : '');
+            const obj = currentResult.object || currentResult.auto_object;
+            const loc = currentResult.location;
+            const isNew = currentResult.is_new === true || currentResult.db_status === 'registered_as_new';
+
+            // Title priority: Arabic name from DB object if Arabic mode, else English name, fallback to Gemini/class
+            const titleAr = obj?.name_ar || obj?.name || gemini.possibleLandmark || currentResult.suggested_class?.replace(/-/g, ' ') || (isIndoor ? 'مقتنيات وحُلي متحفية' : 'معلم أثري');
+            const titleEn = obj?.name || gemini.possibleLandmark || currentResult.suggested_class?.replace(/-/g, ' ') || (isIndoor ? 'Museum Artifacts & Jewelry' : 'Heritage Landmark');
+            const title = T(titleAr, titleEn);
+
+            // Description priority: Arabic description from DB object, fallback to Gemini / general desc
+            const descAr = obj?.description_ar || obj?.description || currentResult.description || gemini.description || (isIndoor ? 'تم استخراج وعزل قطع الحُلي والآثار بدقة عالية عبر الذكاء الاصطناعي.' : '');
+            const descEn = obj?.description || currentResult.description || gemini.description || (isIndoor ? 'Physical artifact instances extracted and segmented via AI.' : '');
+            const desc = T(descAr || descEn, descEn || descAr);
+
             const conf = Math.round((currentResult.confidence_val || (gemini.confidence ? gemini.confidence / 100 : 0.95)) * 100);
+            const locName = loc ? T(loc.name_ar || loc.name, loc.name || loc.name_ar) : (obj?.location_id ? `${T('موقع:', 'Location:')} ${obj.location_id}` : '');
 
             return `
                 <div class="sheet-handle" onclick="closeResults()" aria-label="${T('إغلاق والعودة للكاميرا', 'Close')}"><span></span></div>
                 <div class="sheet-top">
                     <div>
-                        <div class="eyebrow">${isIndoor ? T('💎 مقتنيات متحفية · تجزئة دقيقة', '💎 MUSEUM ARTIFACTS · INSTANCE SEGMENTATION') : T('🏛️ معلم تراثي موثّق', '🏛️ VERIFIED HERITAGE LANDMARK')}</div>
+                        <div class="eyebrow">${isIndoor ? T('💎 مقتنيات متحفية · تجزئة دقيقة', '💎 MUSEUM ARTIFACTS · INSTANCE SEGMENTATION') : T('🏛️ معالم وتراث مصري', '🏛️ EGYPTIAN HERITAGE LANDMARK')}</div>
                         <h2>${title}</h2>
+
+                        <!-- Real-time Database Status Badge -->
+                        <div class="db-status-pill" style="display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:14px;font-size:11px;font-weight:600;margin:4px 0 6px;${isNew ? 'background:#fef3c7;color:#92400e;border:1px solid #f59e0b;' : 'background:#d1fae5;color:#065f46;border:1px solid #10b981;'}">
+                            <span>${isNew ? '✨' : '✅'}</span>
+                            <span>${isNew ? T('أثر ومكان جديد! تم تسجيله وتوثيقه في قاعدة البيانات', 'New item discovered & registered in database!') : T('أثر موثّق ومسجّل بالفعل في قاعدة بياناتنا', 'Verified & registered in our database')}</span>
+                        </div>
+
                         <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
                             <span style="font-size:11px;background:#e2e8f0;color:#1e293b;padding:2px 8px;border-radius:12px;font-weight:600;">${conf}% ${T('تطابق', 'match')}</span>
-                            <span style="font-size:11px;color:var(--muted)">${isIndoor ? T('تقطيع وتفريغ فوري', 'Isolated Crops') : T('معلومات موثقة', 'Verified Info')}</span>
+                            ${locName ? `<span style="font-size:11px;color:var(--muted);display:flex;align-items:center;gap:3px;">📍 ${locName}</span>` : ''}
                         </div>
                     </div>
                     <button class="sheet-close-btn" onclick="closeResults()" aria-label="${T('إغلاق', 'Close')}">
@@ -2943,7 +2923,7 @@
 
             // Ensure activePlaceKey points to a valid destination
             if (!databaseLocations.some(l => l.location_id === activePlaceKey)) {
-                activePlaceKey = databaseLocations[0]?.location_id || 'L003';
+                activePlaceKey = databaseLocations[0]?.location_id || 'L001';
             }
 
             // Socket.IO Real-time Connection

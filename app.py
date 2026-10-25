@@ -896,43 +896,77 @@ def register_landmark_object(landmark_name, class_name=None, lat=None, lng=None,
     obj_id = f"O_{rand_suffix}"
     post_id = f"P_{rand_suffix}"
     
-    # 1. Create Location document
-    loc_doc = {
-        "location_id": loc_id,
-        "name": clean_name,
-        "latitude": lat,
-        "longitude": lng,
-        "geohash": geo_code
-    }
+    # 1. Check if an existing location is within 500m
+    nearby_loc = None
     try:
-        db.locations.insert_one(loc_doc)
+        if lat is not None and lng is not None:
+            all_locs = list(db.locations.find({}))
+            for l in all_locs:
+                if l.get("latitude") and l.get("longitude"):
+                    dist = haversine_meters(lat, lng, float(l["latitude"]), float(l["longitude"]))
+                    if dist <= 500:
+                        nearby_loc = l
+                        loc_id = l["location_id"]
+                        print(f"[REGISTER] Associating new object '{clean_name}' with existing nearby location '{l.get('name')}' ({dist:.1f}m away)")
+                        break
     except Exception as e:
-        print(f"[WARNING] Insert location error: {e}")
+        print(f"[WARNING] Nearby location lookup error: {e}")
+
+    # If no nearby location exists, create a new Location document
+    loc_doc = nearby_loc
+    if not loc_doc:
+        loc_doc = {
+            "location_id": loc_id,
+            "name": clean_name,
+            "name_ar": clean_name,
+            "latitude": lat,
+            "longitude": lng,
+            "geohash": geo_code,
+            "category": "landmarks",
+            "tag_ar": "معلم وتراث مصري",
+            "tag_en": "Egyptian Heritage Destination",
+            "description_ar": description or f"معلم أثري وتاريخي موثّق: {clean_name}",
+            "description_en": description or f"Registered heritage landmark: {clean_name}",
+            "image_url": "/static/images/image1.jpeg"
+        }
+        try:
+            db.locations.insert_one(loc_doc)
+            print(f"[REGISTER] Created new location in database: {clean_name} ({loc_id})")
+        except Exception as e:
+            print(f"[WARNING] Insert location error: {e}")
         
-    # 2. Create Object document
+    # 2. Create Object document with full metadata
     obj_doc = {
         "object_id": obj_id,
         "name": clean_name,
+        "name_ar": clean_name,
         "class_name": clean_class,
         "location_id": loc_id,
         "latitude": lat,
         "longitude": lng,
         "geohash": geo_code,
         "radius_m": 80,
-        "description": description or f"Registered heritage landmark: {clean_name}"
+        "category": loc_doc.get("category", "landmarks"),
+        "description": description or f"Registered heritage landmark: {clean_name}",
+        "description_ar": description or f"معلم أثري مصري موثّق: {clean_name}",
+        "image_url": loc_doc.get("image_url", "/static/images/image1.jpeg"),
+        "is_newly_registered": True
     }
     try:
         db.objects.insert_one(obj_doc)
+        print(f"[REGISTER] Inserted new object in database: {clean_name} ({obj_id})")
     except Exception as e:
         print(f"[WARNING] Insert object error: {e}")
         
     # 3. Create initial Social Post
-    post_content = f"📍 Welcome to {clean_name}! {description}" if description else f"📍 Welcome to {clean_name}! Verified heritage landmark."
+    post_content = f"📍 أهلاً بكم في {clean_name}! {description}" if description else f"📍 أهلاً بكم في {clean_name}! معلم أثري وتاريخي موثق حديثاً."
     post_doc = {
         "post_id": post_id,
         "content": post_content,
         "location_id": loc_id,
-        "object_id": obj_id
+        "object_id": obj_id,
+        "author": "أثرنا — Atharna AI",
+        "createdAt": datetime.datetime.now(datetime.timezone.utc) if use_mongodb else time.strftime("%Y-%m-%dT%H:%M:%SZ")
     }
     try:
         db.posts.insert_one(post_doc)
@@ -986,7 +1020,18 @@ def favicon():
 
 @app.route('/')
 def index():
-    return render_template('index.html')
+    try:
+        locs = serialize_mongo(list(db.locations.find({})))
+        objs = serialize_mongo(list(db.objects.find({})))
+    except Exception as e:
+        print(f"[WARNING] Error fetching db locations/objects for template: {e}")
+        locs = []
+        objs = []
+    return render_template(
+        'index.html',
+        locations_json=json.dumps(locs, ensure_ascii=False),
+        objects_json=json.dumps(objs, ensure_ascii=False)
+    )
 
 @app.route('/api/detect/result/<job_id>', methods=['GET'])
 def api_detect_result(job_id):
@@ -1757,26 +1802,33 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                 ]
             })
 
+            is_new_in_db = False
             if not matched_obj:
-                # Class detected but not yet in DB — register it now so live tracking works
-                print(f"[INFO] YOLO detected '{cls_name}' but no DB entry found. Auto-registering...")
+                is_new_in_db = True
+                print(f"[DATABASE] YOLO detected '{cls_name}' not in DB. Registering as new item...")
                 matched_obj = register_landmark_object(
                     landmark_name=cls_name_alt,
                     class_name=cls_name_hyphen
                 )
-            elif matched_obj.get("latitude") is None or matched_obj.get("longitude") is None:
-                # Entry exists but coords missing — resolve from DB and patch
-                lat_r, lng_r = resolve_landmark_coordinates(cls_name_alt)
-                try:
-                    db.objects.update_one(
-                        {"_id": matched_obj["_id"]},
-                        {"$set": {"latitude": lat_r, "longitude": lng_r,
-                                  "geohash": geohash_encode(lat_r, lng_r, 6)}}
-                    )
-                except Exception as _e:
-                    print(f"[WARNING] Could not patch coords for '{cls_name}': {_e}")
-                matched_obj["latitude"]  = lat_r
-                matched_obj["longitude"] = lng_r
+            else:
+                print(f"[DATABASE] Verified existing landmark in DB: {matched_obj.get('name')}")
+                if matched_obj.get("latitude") is None or matched_obj.get("longitude") is None:
+                    # Entry exists but coords missing — resolve from DB and patch
+                    lat_r, lng_r = resolve_landmark_coordinates(cls_name_alt)
+                    try:
+                        db.objects.update_one(
+                            {"_id": matched_obj["_id"]},
+                            {"$set": {"latitude": lat_r, "longitude": lng_r,
+                                      "geohash": geohash_encode(lat_r, lng_r, 6)}}
+                        )
+                    except Exception as _e:
+                        print(f"[WARNING] Could not patch coords for '{cls_name}': {_e}")
+                    matched_obj["latitude"]  = lat_r
+                    matched_obj["longitude"] = lng_r
+
+            matched_loc = None
+            if matched_obj and matched_obj.get("location_id"):
+                matched_loc = db.locations.find_one({"location_id": matched_obj["location_id"]})
 
             posts = []
             if matched_obj and "object_id" in matched_obj:
@@ -1814,12 +1866,16 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                 'inference_time': f"{inference_time:.1f}ms",
                 'is_custom': is_custom_active,
                 'recognition_method': 'YOLO',
+                'is_new': is_new_in_db,
+                'db_status': 'registered_as_new' if is_new_in_db else 'found_in_database',
+                'db_status_message': "✨ أثر جديد! تم تسجيله وإضافته لقاعدة البيانات" if is_new_in_db else "✅ أثر موثّق ومسجّل بالفعل في قاعدة البيانات",
                 'segmentation': {
                     'enabled': True,
                     'polygons': all_polys,
                     'method': 'YOLO Instance Segmentation Mask' if (hasattr(result, 'masks') and result.masks is not None) else 'AI Visual Instance Mask'
                 },
                 'object': serialize_mongo(matched_obj) if matched_obj else None,
+                'location': serialize_mongo(matched_loc) if matched_loc else None,
                 'posts': serialize_mongo(posts)
             }
             
@@ -1991,6 +2047,32 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                 landmark_label = gemini_res.get("possibleLandmark")
                 label_txt = f" ({landmark_label})" if landmark_label and landmark_label != "Unknown" else ""
 
+                matched_obj = None
+                matched_loc = None
+                is_new_in_db = False
+                if landmark_label and landmark_label != "Unknown":
+                    clean_lbl = landmark_label.lower().strip()
+                    matched_obj = db.objects.find_one({
+                        "$or": [
+                            {"name": {"$regex": re.compile(f"^{re.escape(clean_lbl)}$", re.IGNORECASE)}},
+                            {"name_ar": {"$regex": re.compile(f"^{re.escape(clean_lbl)}$", re.IGNORECASE)}},
+                            {"class_name": {"$regex": re.compile(f"^{re.escape(clean_lbl)}$", re.IGNORECASE)}}
+                        ]
+                    })
+                    if not matched_obj:
+                        is_new_in_db = True
+                        matched_obj = register_landmark_object(
+                            landmark_name=landmark_label,
+                            class_name=landmark_label.replace(" ", "-"),
+                            description=gemini_res.get("description", "")
+                        )
+                    if matched_obj and matched_obj.get("location_id"):
+                        matched_loc = db.locations.find_one({"location_id": matched_obj["location_id"]})
+                if not matched_loc:
+                    matched_loc = db.locations.find_one({"category": "museum"}) or db.locations.find_one({"location_id": "L002"})
+
+                posts = list(db.posts.find({"object_id": matched_obj["object_id"]})) if (matched_obj and "object_id" in matched_obj) else []
+
                 return {
                     'pipeline': 'artifact_segmentation',
                     'scene_type': 'indoor',
@@ -2001,7 +2083,13 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                     'results_json': seg_res["results"],
                     'num_items': len(items_enhanced),
                     'gemini': gemini_res,
-                    'router_msg': f"💎 AI Auto-Detected: Indoor Museum Artifact{label_txt} → Artifact Segmentation Pipeline Executed"
+                    'router_msg': f"💎 AI Auto-Detected: Indoor Museum Artifact{label_txt} → Artifact Segmentation Pipeline Executed",
+                    'is_new': is_new_in_db,
+                    'db_status': 'registered_as_new' if is_new_in_db else 'found_in_database',
+                    'db_status_message': "✨ قطعة جديدة تم تسجيلها وتوثيقها في قاعدة البيانات" if is_new_in_db else "✅ مقتنيات موثّقة ومسجّلة بالفعل في قاعدة البيانات",
+                    'object': serialize_mongo(matched_obj) if matched_obj else None,
+                    'location': serialize_mongo(matched_loc) if matched_loc else None,
+                    'posts': serialize_mongo(posts)
                 }
             except Exception as seg_err:
                 print(f"[WARNING] Artifact segmentation pipeline failed: {seg_err}, falling back to landmark pipeline")
@@ -2048,12 +2136,12 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
             img, (x1, y1, x2, y2), suggested_landmark, f"{confidence_val:.1%}", color=(185, 6, 212)
         )
                     
-        # ── Auto-Confirm Check ──────────────────────────────────────────────
-        # If Gemini identified a landmark that already exists in our DB as a
-        # registered object (i.e. it was previously confirmed), auto-save this
-        # image as training data without asking the user again.
+        # ── Auto-Confirm & Database Matching Check ──────────────────────────────
         auto_confirmed = False
         existing_db_obj = None
+        matched_loc = None
+        is_new_in_db = False
+
         if suggested_landmark and suggested_landmark != "Unknown":
             lm_clean  = suggested_landmark.lower().strip()
             lm_hyphen = lm_clean.replace(" ", "-")
@@ -2061,13 +2149,32 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
                 "$or": [
                     {"name":       {"$regex": re.compile(f"^{re.escape(lm_clean)}$",  re.IGNORECASE)}},
                     {"name":       {"$regex": re.compile(f"^{re.escape(lm_hyphen)}$", re.IGNORECASE)}},
+                    {"name_ar":    {"$regex": re.compile(f"^{re.escape(lm_clean)}$",  re.IGNORECASE)}},
                     {"class_name": {"$regex": re.compile(f"^{re.escape(lm_clean)}$",  re.IGNORECASE)}},
                     {"class_name": {"$regex": re.compile(f"^{re.escape(lm_hyphen)}$", re.IGNORECASE)}},
                 ]
             })
-            if existing_db_obj and confidence_val >= 0.60:
-                auto_confirmed = True
-                print(f"[AUTO-CONFIRM] '{suggested_landmark}' already in DB with conf {confidence_val:.0%}. Auto-saving training sample.")
+            if existing_db_obj:
+                is_new_in_db = False
+                if confidence_val >= 0.60:
+                    auto_confirmed = True
+                if existing_db_obj.get("location_id"):
+                    matched_loc = db.locations.find_one({"location_id": existing_db_obj["location_id"]})
+                print(f"[DATABASE] Verified existing landmark in DB: {existing_db_obj.get('name')}")
+            else:
+                # Landmark not found in DB! Register it as a new item in the database!
+                is_new_in_db = True
+                auto_confirmed = False
+                print(f"[DATABASE] Landmark '{suggested_landmark}' is NOT in database. Registering as new item...")
+                existing_db_obj = register_landmark_object(
+                    landmark_name=suggested_landmark,
+                    class_name=suggested_landmark.replace(" ", "-"),
+                    lat=lat_context,
+                    lng=lng_context,
+                    description=description
+                )
+                if existing_db_obj and existing_db_obj.get("location_id"):
+                    matched_loc = db.locations.find_one({"location_id": existing_db_obj["location_id"]})
 
         # Save temporary image for verify preview
         temp_img_path = os.path.join("temp_uploads", f"{img_hash}.jpg")
@@ -2081,7 +2188,7 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
 
         # If auto-confirmed, immediately save as approved training sample
         auto_status = "approved" if auto_confirmed else "pending"
-        if auto_confirmed:
+        if auto_confirmed and existing_db_obj:
             class_name_for_save = (existing_db_obj.get("class_name") or suggested_landmark).replace(" ", "-")
             save_verified_sample(
                 image_bytes=file_bytes,
@@ -2101,7 +2208,7 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
             "imagePath": f"uploads/candidates/{candidate_filename}",
             "description": description,
             "suggestedLandmark": suggested_landmark,
-            "isNewLandmark": is_new_landmark,
+            "isNewLandmark": is_new_in_db,
             "confidence": int(confidence_val * 100),
             "reason": gemini_res.get("reason", ""),
             "latitude": lat_context,
@@ -2124,9 +2231,9 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
         _, buffer = cv2.imencode('.jpg', annotated_img)
         encoded_image = base64.b64encode(buffer).decode('utf-8')
 
-        # Posts for the object (auto-confirm case shows them immediately)
+        # Posts for the object
         auto_posts = []
-        if auto_confirmed and existing_db_obj and existing_db_obj.get("object_id"):
+        if existing_db_obj and existing_db_obj.get("object_id"):
             auto_posts = list(db.posts.find({"object_id": existing_db_obj["object_id"]}).sort("createdAt", -1))
         
         return {
@@ -2138,6 +2245,9 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
             'inference_time': f"{(time.time() - t0)*1000:.1f}ms",
             'is_custom': False,
             'recognition_method': 'Zero-Shot',
+            'is_new': is_new_in_db,
+            'db_status': 'registered_as_new' if is_new_in_db else 'found_in_database',
+            'db_status_message': "✨ أثر جديد! تم تسجيله وإضافته لقاعدة البيانات" if is_new_in_db else "✅ أثر موثّق ومسجّل بالفعل في قاعدة البيانات",
             'segmentation': {
                 'enabled': True,
                 'polygon': poly,
@@ -2152,16 +2262,19 @@ def _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, l
             'filename': filename,
             'trainingCandidateId': cand_id,
             'auto_confirmed': auto_confirmed,
-            'auto_object': serialize_mongo(existing_db_obj) if auto_confirmed else None,
-            'auto_posts': serialize_mongo(auto_posts) if auto_confirmed else [],
+            'object': serialize_mongo(existing_db_obj),
+            'location': serialize_mongo(matched_loc),
+            'posts': serialize_mongo(auto_posts),
+            'auto_object': serialize_mongo(existing_db_obj),
+            'auto_posts': serialize_mongo(auto_posts),
             'gemini': {
                 'description': description,
                 'possibleLandmark': suggested_landmark,
-                'isNewLandmark': is_new_landmark,
+                'isNewLandmark': is_new_in_db,
                 'confidence': int(confidence_val * 100),
                 'reason': gemini_res.get("reason", "")
             },
-            'unknown': not auto_confirmed,
+            'unknown': is_new_in_db,
             'nearbyCandidates': [{'locationName': l['name'], 'objects': [o['name'] for o in db.objects.find({'location_id': l['location_id']})]} for l in nearby_locs]
         }
         
