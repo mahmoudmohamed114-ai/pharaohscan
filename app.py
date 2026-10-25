@@ -1451,18 +1451,25 @@ def api_detect():
         _, buf = cv2.imencode('.jpg', img, [int(cv2.IMWRITE_JPEG_QUALITY), 88])
         file_bytes = buf.tobytes()
 
-    # Create job entry and launch background thread
+    # Execute detection directly in the request greenlet (takes ~1.2s: Gemini REST + OpenCV 15ms)
+    # This prevents 'greenlet.error: Cannot switch to a different thread' in Eventlet
     job_id = str(uuid.uuid4())
-    with _job_lock:
-        _job_store[job_id] = {"status": "pending", "ts": time.time()}
-
-    threading.Thread(
-        target=_run_detect_job,
-        args=(job_id, _do_detect_sync, file_bytes, img, filename, mimetype, model_type, lat_form, lng_form),
-        daemon=True
-    ).start()
-
-    return jsonify({"job_id": job_id, "status": "pending"})
+    try:
+        result = _do_detect_sync(file_bytes, img, filename, mimetype, model_type, lat_form, lng_form)
+        if isinstance(result, dict):
+            result['job_id'] = job_id
+            result['status'] = 'done'
+        with _job_lock:
+            _job_store[job_id] = {"status": "done", "result": result, "ts": time.time()}
+        return jsonify(result)
+    except Exception as e:
+        print(f"[ERROR] Detection execution failed: {e}")
+        import traceback
+        traceback.print_exc()
+        err_res = {"error": str(e), "job_id": job_id, "status": "error"}
+        with _job_lock:
+            _job_store[job_id] = {"status": "error", "result": err_res, "ts": time.time()}
+        return jsonify(err_res), 500
 
 
 def generate_visual_segmentation(img, box_coords, label="Landmark", conf_str="95%", color=(16, 185, 129), yolo_mask=None):

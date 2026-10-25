@@ -1769,12 +1769,24 @@
                     throw new Error(json.error);
                 }
 
+                // If result is returned directly (immediate response from synchronous greenlet)
+                if (json.pipeline || json.success || json.detections) {
+                    isScanningActive = false;
+                    currentResult = json;
+                    isResultOpen = true;
+                    isStorySaved = false;
+                    resultActiveTab = 'place';
+                    showToast(json.router_msg || T('تم التعرّف على الأثر بنجاح!', 'Identified successfully!'));
+                    renderWorkspace();
+                    return;
+                }
+
                 const jobId = json.job_id;
                 if (!jobId) {
                     throw new Error('No job ID returned.');
                 }
 
-                // Poll job result
+                // Poll job result fallback
                 pollDetectionJob(jobId);
             } catch (err) {
                 console.error('Detection error:', err);
